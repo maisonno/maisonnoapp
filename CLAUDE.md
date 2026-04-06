@@ -50,7 +50,8 @@ src/app/projects/mon-projet/
 ├── page.tsx          ← Page principale (Server Component)
 ├── actions.ts        ← Server Actions spécifiques au projet (optionnel)
 ├── components/       ← Composants UI propres au projet
-└── lib/              ← Logique métier, helpers, types
+├── lib/              ← Logique métier, helpers, types
+└── docs/             ← Documentation du projet (voir section Documentation)
 ```
 
 La route sera automatiquement disponible à `/projects/mon-projet`.
@@ -147,6 +148,29 @@ import { createClient } from '@/lib/supabase/client'
 
 const supabase = createClient()
 ```
+
+---
+
+## Documentation
+
+**À chaque évolution d'un projet, Claude doit maintenir la documentation à jour.**
+
+La documentation de chaque mini-projet est enregistrée dans des fichiers `.md` organisés par module ou thème, dans le dossier `docs/` du projet concerné.
+
+```
+src/app/projects/mon-projet/docs/
+├── overview.md         ← Vue d'ensemble fonctionnelle (quoi, pourquoi, pour qui)
+├── architecture.md     ← Choix techniques, structure des composants, flux de données
+├── database.md         ← Schéma des tables, relations, politiques RLS
+├── api.md              ← Server Actions et routes API exposées
+└── changelog.md        ← Historique des évolutions significatives
+```
+
+**Règles :**
+- Créer le dossier `docs/` dès la création du projet, avec au minimum `overview.md`
+- Mettre à jour le fichier concerné **dans le même commit** que le code qu'il documente
+- Un fichier par thème — ne pas tout mettre dans un seul fichier monolithique
+- La documentation doit être suffisamment précise pour qu'un développeur reprenne le projet sans avoir à lire tout le code
 
 ---
 
