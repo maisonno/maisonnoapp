@@ -1,6 +1,6 @@
 import { redirect, notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
-import { getMenuWithItems, getDishes, getGeneratedDocs } from '../lib/queries'
+import { getMenuWithItems, getDishes, getGeneratedDocs, getTemplates } from '../lib/queries'
 import MenuEditorClient from '../components/editor/MenuEditorClient'
 import DocumentPanel from '../components/editor/DocumentPanel'
 import Link from 'next/link'
@@ -22,10 +22,11 @@ export default async function MenuEditorPage({ params }: Props) {
   if (!user) redirect('/login')
 
   const { menuId } = await params
-  const [menu, dishes, docs] = await Promise.all([
+  const [menu, dishes, docs, templates] = await Promise.all([
     getMenuWithItems(menuId),
     getDishes(),
     getGeneratedDocs(menuId),
+    getTemplates(),
   ])
 
   if (!menu) notFound()
@@ -57,7 +58,7 @@ export default async function MenuEditorPage({ params }: Props) {
         {/* Documents */}
         <section>
           <h2 className="text-base font-semibold text-gray-700 mb-3">Documents</h2>
-          <DocumentPanel menuId={menu.id} docs={docs} />
+          <DocumentPanel menuId={menu.id} docs={docs} templates={templates} />
         </section>
       </main>
     </div>

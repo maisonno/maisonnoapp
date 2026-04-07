@@ -323,3 +323,50 @@ export async function toggleFeatured(itemId: string, currentValue: boolean): Pro
   revalidatePath(REVALIDATE_PATH)
   return null
 }
+
+// ─────────────────────────────────────────────
+// TEMPLATES
+// ─────────────────────────────────────────────
+
+export async function createTemplate(name: string, storagePath: string, description: string): Promise<ActionState> {
+  const supabase = await createClient()
+
+  const { error } = await supabase.from('mnu_templates').insert({
+    name: name.trim(),
+    storage_path: storagePath,
+    description: description.trim() || null,
+  })
+
+  if (error) return { error: error.message }
+
+  revalidatePath(REVALIDATE_PATH)
+  return { success: 'Modèle créé.' }
+}
+
+export async function updateTemplate(id: string, name: string, description: string): Promise<ActionState> {
+  const supabase = await createClient()
+
+  const { error } = await supabase
+    .from('mnu_templates')
+    .update({ name: name.trim(), description: description.trim() || null })
+    .eq('id', id)
+
+  if (error) return { error: error.message }
+
+  revalidatePath(REVALIDATE_PATH)
+  return { success: 'Modèle mis à jour.' }
+}
+
+export async function deleteTemplate(id: string, storagePath: string | null): Promise<ActionState> {
+  const supabase = await createClient()
+
+  if (storagePath) {
+    await supabase.storage.from('templates').remove([storagePath])
+  }
+
+  const { error } = await supabase.from('mnu_templates').delete().eq('id', id)
+  if (error) return { error: error.message }
+
+  revalidatePath(REVALIDATE_PATH)
+  return { success: 'Modèle supprimé.' }
+}

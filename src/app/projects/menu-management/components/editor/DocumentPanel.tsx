@@ -1,77 +1,85 @@
 'use client'
 
 import { useState } from 'react'
-import type { GeneratedDoc, TemplateName } from '../../lib/types'
-import { TEMPLATE_LABELS } from '../../lib/types'
+import Link from 'next/link'
+import type { GeneratedDoc, Template } from '../../lib/types'
 
 type Props = {
   menuId: string
   docs: GeneratedDoc[]
+  templates: Template[]
 }
-
-const TEMPLATES: TemplateName[] = ['menu-table', 'affiche-facade', 'grande-affiche']
 
 type GenerateState = 'idle' | 'loading' | 'error'
 
-export default function DocumentPanel({ menuId, docs }: Props) {
-  const [states, setStates] = useState<Record<TemplateName, GenerateState>>({
-    'menu-table': 'idle',
-    'affiche-facade': 'idle',
-    'grande-affiche': 'idle',
-  })
-  const [errors, setErrors] = useState<Record<TemplateName, string>>({
-    'menu-table': '',
-    'affiche-facade': '',
-    'grande-affiche': '',
-  })
+export default function DocumentPanel({ menuId, docs, templates }: Props) {
+  const [states, setStates] = useState<Record<string, GenerateState>>({})
+  const [errors, setErrors] = useState<Record<string, string>>({})
   const [freshDocs, setFreshDocs] = useState<GeneratedDoc[]>(docs)
 
-  const latestDoc = (template: TemplateName) =>
+  const latestDoc = (templateId: string) =>
     freshDocs
-      .filter((d) => d.template_name === template)
+      .filter((d) => d.template_name === templateId)
       .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0]
 
-  const handleGenerate = async (template: TemplateName) => {
-    setStates((s) => ({ ...s, [template]: 'loading' }))
-    setErrors((e) => ({ ...e, [template]: '' }))
+  const handleGenerate = async (templateId: string) => {
+    setStates((s) => ({ ...s, [templateId]: 'loading' }))
+    setErrors((e) => ({ ...e, [templateId]: '' }))
 
     try {
       const res = await fetch('/projects/menu-management/api/generate-docs', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ menuId, template }),
+        body: JSON.stringify({ menuId, templateId }),
       })
 
       const data = await res.json() as { error?: string; doc?: GeneratedDoc }
 
       if (!res.ok || data.error) {
-        setErrors((e) => ({ ...e, [template]: data.error ?? 'Erreur de génération.' }))
-        setStates((s) => ({ ...s, [template]: 'error' }))
+        setErrors((e) => ({ ...e, [templateId]: data.error ?? 'Erreur de génération.' }))
+        setStates((s) => ({ ...s, [templateId]: 'error' }))
         return
       }
 
       if (data.doc) {
         setFreshDocs((prev) => [data.doc!, ...prev])
       }
-      setStates((s) => ({ ...s, [template]: 'idle' }))
+      setStates((s) => ({ ...s, [templateId]: 'idle' }))
     } catch {
-      setErrors((e) => ({ ...e, [template]: 'Erreur réseau.' }))
-      setStates((s) => ({ ...s, [template]: 'error' }))
+      setErrors((e) => ({ ...e, [templateId]: 'Erreur réseau.' }))
+      setStates((s) => ({ ...s, [templateId]: 'error' }))
     }
+  }
+
+  if (templates.length === 0) {
+    return (
+      <div className="rounded-lg border bg-white px-4 py-8 text-center shadow-sm">
+        <p className="text-sm text-gray-400">
+          Aucun modèle disponible.{' '}
+          <Link href="/projects/menu-management?tab=templates" className="text-blue-600 hover:underline">
+            Créez un modèle
+          </Link>{' '}
+          pour générer des documents.
+        </p>
+      </div>
+    )
   }
 
   return (
     <div className="space-y-3">
-      {TEMPLATES.map((template) => {
-        const doc = latestDoc(template)
-        const state = states[template]
-        const error = errors[template]
+      {templates.map((template) => {
+        const doc = latestDoc(template.id)
+        const state = states[template.id] ?? 'idle'
+        const error = errors[template.id] ?? ''
 
         return (
-          <div key={template} className="rounded-lg border bg-white px-4 py-3 shadow-sm">
+          <div key={template.id} className="rounded-lg border bg-white px-4 py-3 shadow-sm">
             <div className="flex items-center justify-between gap-3">
               <div>
-                <p className="font-medium text-sm text-gray-800">{TEMPLATE_LABELS[template]}</p>
+                <p className="font-medium text-sm text-gray-800">{template.name}</p>
+                {template.description && (
+                  <p className="text-xs text-gray-500 mt-0.5">{template.description}</p>
+                )}
                 {doc && (
                   <p className="text-xs text-gray-400 mt-0.5">
                     Généré le {new Date(doc.created_at).toLocaleString('fr-FR')}
@@ -101,14 +109,19 @@ export default function DocumentPanel({ menuId, docs }: Props) {
                   </a>
                 )}
                 <button
-                  onClick={() => handleGenerate(template)}
-                  disabled={state === 'loading'}
+                  onClick={() => handleGenerate(template.id)}
+                  disabled={state === 'loading' || !template.storage_path}
                   className="rounded-md bg-gray-800 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-gray-700 disabled:opacity-50"
+                  title={!template.storage_path ? 'Aucun fichier .docx uploadé pour ce modèle' : undefined}
                 >
                   {state === 'loading' ? 'Génération…' : doc ? 'Regénérer' : 'Générer'}
                 </button>
               </div>
             </div>
+
+            {!template.storage_path && (
+              <p className="mt-2 text-xs text-amber-600">⚠ Aucun fichier .docx pour ce modèle.</p>
+            )}
 
             {error && (
               <p className="mt-2 rounded-md bg-red-50 px-3 py-1.5 text-xs text-red-700">{error}</p>

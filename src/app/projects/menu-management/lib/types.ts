@@ -66,19 +66,20 @@ export type MenuWithItems = Menu & {
 export type GeneratedDoc = {
   id: string
   menu_id: string
-  template_name: TemplateName
+  template_name: string
   docx_path: string | null
   pdf_path: string | null
   expires_at: string
   created_at: string
 }
 
-export type TemplateName = 'menu-table' | 'affiche-facade' | 'grande-affiche'
-
-export const TEMPLATE_LABELS: Record<TemplateName, string> = {
-  'menu-table': 'Menu à table (A5)',
-  'affiche-facade': 'Affiche façade (A4)',
-  'grande-affiche': 'Grande affiche (A3)',
+export type Template = {
+  id: string
+  name: string
+  storage_path: string | null
+  description: string | null
+  created_at: string
+  updated_at: string
 }
 
 export type ActionState = { error?: string; success?: string } | null

@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
-import type { Dish, Menu, MenuItem, MenuWithItems, GeneratedDoc } from './types'
+import type { Dish, Menu, MenuItem, MenuWithItems, GeneratedDoc, Template } from './types'
 import { CATEGORY_ORDER } from './types'
 
 export async function getDishes(): Promise<Dish[]> {
@@ -67,4 +67,15 @@ export async function getGeneratedDocs(menuId: string): Promise<GeneratedDoc[]> 
 
   if (error) throw new Error(error.message)
   return data as GeneratedDoc[]
+}
+
+export async function getTemplates(): Promise<Template[]> {
+  const supabase = await createClient()
+  const { data, error } = await supabase
+    .from('mnu_templates')
+    .select('*')
+    .order('created_at')
+
+  if (error) throw new Error(error.message)
+  return data as Template[]
 }

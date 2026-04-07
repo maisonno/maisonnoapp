@@ -6,6 +6,7 @@ import { useSearchParams } from 'next/navigation'
 const TABS = [
   { key: 'menus', label: 'Menus' },
   { key: 'dishes', label: 'Catalogue des plats' },
+  { key: 'templates', label: 'Modèles' },
 ]
 
 export default function TabBar() {

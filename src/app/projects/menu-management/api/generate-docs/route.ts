@@ -1,15 +1,12 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import path from 'path'
-import fs from 'fs'
 import Docxtemplater from 'docxtemplater'
 import PizZip from 'pizzip'
-import type { TemplateName } from '../../lib/types'
 import { CATEGORY_ORDER, CATEGORY_LABELS } from '../../lib/types'
 
 type RequestBody = {
   menuId: string
-  template: TemplateName
+  templateId: string
 }
 
 export async function POST(request: Request) {
@@ -28,14 +25,24 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Corps de requête invalide.' }, { status: 400 })
   }
 
-  const { menuId, template } = body
-  if (!menuId || !template) {
-    return NextResponse.json({ error: 'menuId et template sont requis.' }, { status: 400 })
+  const { menuId, templateId } = body
+  if (!menuId || !templateId) {
+    return NextResponse.json({ error: 'menuId et templateId sont requis.' }, { status: 400 })
   }
 
-  const validTemplates: TemplateName[] = ['menu-table', 'affiche-facade', 'grande-affiche']
-  if (!validTemplates.includes(template)) {
-    return NextResponse.json({ error: 'Template inconnu.' }, { status: 400 })
+  // Fetch template record
+  const { data: templateRecord, error: templateErr } = await supabase
+    .from('mnu_templates')
+    .select('*')
+    .eq('id', templateId)
+    .single()
+
+  if (templateErr || !templateRecord) {
+    return NextResponse.json({ error: 'Modèle introuvable.' }, { status: 404 })
+  }
+
+  if (!templateRecord.storage_path) {
+    return NextResponse.json({ error: 'Ce modèle n\'a pas de fichier .docx associé.' }, { status: 400 })
   }
 
   // Fetch menu + items
@@ -83,7 +90,6 @@ export async function POST(request: Request) {
     })
     .filter(Boolean)
 
-  // Helper : liste de plats pour une catégorie donnée
   const dishesForCat = (cat: string) =>
     items
       .filter((i) => i.dish.category === cat)
@@ -98,9 +104,7 @@ export async function POST(request: Request) {
     menu_label: menu.label,
     menu_date: menuDate,
     notes: menu.notes ?? '',
-    // Boucle générique toutes catégories
     categories,
-    // Variables par catégorie (utiliser directement dans le template)
     entrees:    dishesForCat('entree'),
     a_partager: dishesForCat('a_partager'),
     plats:      dishesForCat('plat'),
@@ -108,7 +112,6 @@ export async function POST(request: Request) {
     salades:    dishesForCat('salade'),
     desserts:   dishesForCat('dessert'),
     glaces:     dishesForCat('glace'),
-    // Drapeaux booléens (pour affichage conditionnel)
     has_entrees:    items.some((i) => i.dish.category === 'entree'),
     has_a_partager: items.some((i) => i.dish.category === 'a_partager'),
     has_plats:      items.some((i) => i.dish.category === 'plat'),
@@ -116,7 +119,6 @@ export async function POST(request: Request) {
     has_salades:    items.some((i) => i.dish.category === 'salade'),
     has_desserts:   items.some((i) => i.dish.category === 'dessert'),
     has_glaces:     items.some((i) => i.dish.category === 'glace'),
-    // Plats mis en avant
     featured_dishes: items
       .filter((i) => i.is_featured)
       .map((i) => ({
@@ -135,20 +137,23 @@ export async function POST(request: Request) {
     })),
   }
 
-  // Load .docx template
-  const templatePath = path.join(process.cwd(), 'public', 'templates', `${template}.docx`)
+  // Download .docx template from Supabase Storage
+  const { data: templateFileData, error: downloadErr } = await supabase.storage
+    .from('templates')
+    .download(templateRecord.storage_path)
 
-  if (!fs.existsSync(templatePath)) {
+  if (downloadErr || !templateFileData) {
     return NextResponse.json(
-      { error: `Template "${template}.docx" introuvable dans public/templates/. Veuillez l'uploader.` },
+      { error: `Impossible de télécharger le modèle : ${downloadErr?.message ?? 'fichier introuvable'}` },
       { status: 500 },
     )
   }
 
+  // Fill template with docxtemplater
   let docxBuffer: Buffer
   try {
-    const content = fs.readFileSync(templatePath)
-    const zip = new PizZip(content)
+    const arrayBuffer = await templateFileData.arrayBuffer()
+    const zip = new PizZip(arrayBuffer)
     const doc = new Docxtemplater(zip, {
       paragraphLoop: true,
       linebreaks: true,
@@ -160,10 +165,11 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: `Erreur génération DOCX : ${message}` }, { status: 500 })
   }
 
-  // Upload DOCX to Supabase Storage
+  // Upload filled DOCX to Supabase Storage
   const timestamp = Date.now()
-  const docxStoragePath = `${menuId}/${template}-${timestamp}.docx`
-  const pdfStoragePath = `${menuId}/${template}-${timestamp}.pdf`
+  const safeName = templateRecord.name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')
+  const docxStoragePath = `${menuId}/${safeName}-${timestamp}.docx`
+  const pdfStoragePath = `${menuId}/${safeName}-${timestamp}.pdf`
 
   const { error: docxUploadErr } = await supabase.storage
     .from('generated-docs')
@@ -186,7 +192,7 @@ export async function POST(request: Request) {
       const docxBlob = new Blob([new Uint8Array(docxBuffer)], {
         type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
       })
-      formData.append('files', docxBlob, `${template}.docx`)
+      formData.append('files', docxBlob, `${safeName}.docx`)
 
       const gotenbergRes = await fetch(`${gotenbergUrl}/forms/libreoffice/convert`, {
         method: 'POST',
@@ -222,14 +228,14 @@ export async function POST(request: Request) {
     ? (await supabase.storage.from('generated-docs').createSignedUrl(pdfStoragePathFinal, expiry)).data
     : null
 
-  // Record in DB
+  // Record in DB — store template id as template_name for lookup
   const expiresAt = new Date(Date.now() + expiry * 1000).toISOString()
 
   const { data: docRecord, error: dbErr } = await supabase
     .from('mnu_generated_docs')
     .insert({
       menu_id: menuId,
-      template_name: template,
+      template_name: templateId,
       docx_path: docxUrl?.signedUrl ?? null,
       pdf_path: pdfSignedUrl?.signedUrl ?? null,
       expires_at: expiresAt,

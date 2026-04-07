@@ -1,10 +1,11 @@
 import { redirect } from 'next/navigation'
 import { Suspense } from 'react'
 import { createClient } from '@/lib/supabase/server'
-import { getDishes, getMenus } from './lib/queries'
+import { getDishes, getMenus, getTemplates } from './lib/queries'
 import TabBar from './components/TabBar'
 import MenuList from './components/menus/MenuList'
 import DishList from './components/dishes/DishList'
+import TemplateList from './components/templates/TemplateList'
 import Link from 'next/link'
 
 type Props = {
@@ -21,9 +22,9 @@ export default async function MenuManagementPage({ searchParams }: Props) {
   if (!user) redirect('/login')
 
   const params = await searchParams
-  const activeTab = params.tab === 'dishes' ? 'dishes' : 'menus'
+  const activeTab = params.tab === 'dishes' ? 'dishes' : params.tab === 'templates' ? 'templates' : 'menus'
 
-  const [menus, dishes] = await Promise.all([getMenus(), getDishes()])
+  const [menus, dishes, templates] = await Promise.all([getMenus(), getDishes(), getTemplates()])
 
   // Get item counts per menu
   const { data: countRows } = await supabase
@@ -63,6 +64,9 @@ export default async function MenuManagementPage({ searchParams }: Props) {
           )}
           {activeTab === 'dishes' && (
             <DishList dishes={dishes} />
+          )}
+          {activeTab === 'templates' && (
+            <TemplateList templates={templates} />
           )}
         </div>
       </main>
