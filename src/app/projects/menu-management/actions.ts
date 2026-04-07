@@ -1,0 +1,326 @@
+'use server'
+
+import { revalidatePath } from 'next/cache'
+import { createClient } from '@/lib/supabase/server'
+import { parseDishesFromBuffer } from './lib/csv-parser'
+import type { ActionState, DishCategory } from './lib/types'
+
+const REVALIDATE_PATH = '/projects/menu-management'
+
+// ─────────────────────────────────────────────
+// DISHES
+// ─────────────────────────────────────────────
+
+export async function createDish(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const supabase = await createClient()
+
+  const name = formData.get('name') as string
+  const description = (formData.get('description') as string) || null
+  const priceRaw = formData.get('price') as string
+  const price = priceRaw ? parseFloat(priceRaw) : null
+  const category = formData.get('category') as DishCategory
+  const is_active = formData.get('is_active') !== 'false'
+
+  if (!name?.trim()) return { error: 'Le nom est obligatoire.' }
+
+  const { error } = await supabase.from('mnu_dishes').insert({
+    name: name.trim(),
+    description: description?.trim() || null,
+    price,
+    category,
+    is_active,
+  })
+
+  if (error) return { error: error.message }
+
+  revalidatePath(REVALIDATE_PATH)
+  return { success: 'Plat créé.' }
+}
+
+export async function updateDish(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const supabase = await createClient()
+
+  const id = formData.get('id') as string
+  const name = formData.get('name') as string
+  const description = (formData.get('description') as string) || null
+  const priceRaw = formData.get('price') as string
+  const price = priceRaw ? parseFloat(priceRaw) : null
+  const category = formData.get('category') as DishCategory
+  const is_active = formData.get('is_active') !== 'false'
+
+  if (!name?.trim()) return { error: 'Le nom est obligatoire.' }
+
+  const { error } = await supabase
+    .from('mnu_dishes')
+    .update({ name: name.trim(), description: description?.trim() || null, price, category, is_active })
+    .eq('id', id)
+
+  if (error) return { error: error.message }
+
+  revalidatePath(REVALIDATE_PATH)
+  return { success: 'Plat mis à jour.' }
+}
+
+export async function deleteDish(id: string): Promise<ActionState> {
+  const supabase = await createClient()
+
+  // Check not used in any menu
+  const { count } = await supabase
+    .from('mnu_menu_items')
+    .select('id', { count: 'exact', head: true })
+    .eq('dish_id', id)
+
+  if (count && count > 0) {
+    return { error: 'Ce plat est utilisé dans un menu. Retirez-le d\'abord.' }
+  }
+
+  const { error } = await supabase.from('mnu_dishes').delete().eq('id', id)
+  if (error) return { error: error.message }
+
+  revalidatePath(REVALIDATE_PATH)
+  return { success: 'Plat supprimé.' }
+}
+
+export async function toggleDishActive(id: string, currentValue: boolean): Promise<ActionState> {
+  const supabase = await createClient()
+  const { error } = await supabase
+    .from('mnu_dishes')
+    .update({ is_active: !currentValue })
+    .eq('id', id)
+
+  if (error) return { error: error.message }
+
+  revalidatePath(REVALIDATE_PATH)
+  return null
+}
+
+export async function importDishesFromCsv(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const file = formData.get('file') as File
+  if (!file || file.size === 0) return { error: 'Fichier manquant.' }
+
+  const buffer = await file.arrayBuffer()
+  const { rows, errors } = parseDishesFromBuffer(buffer)
+
+  if (errors.length > 0 && rows.length === 0) {
+    return { error: errors.join('\n') }
+  }
+
+  const supabase = await createClient()
+  const { error } = await supabase.from('mnu_dishes').upsert(
+    rows.map((r) => ({ ...r })),
+    { onConflict: 'name' },
+  )
+
+  if (error) return { error: error.message }
+
+  revalidatePath(REVALIDATE_PATH)
+  const msg = `${rows.length} plat(s) importé(s).${errors.length > 0 ? '\nAvertissements : ' + errors.join('; ') : ''}`
+  return { success: msg }
+}
+
+// ─────────────────────────────────────────────
+// MENUS
+// ─────────────────────────────────────────────
+
+export async function createMenu(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const supabase = await createClient()
+
+  const label = formData.get('label') as string
+  const menu_date = formData.get('menu_date') as string
+  const notes = (formData.get('notes') as string) || null
+
+  if (!label?.trim()) return { error: 'Le libellé est obligatoire.' }
+  if (!menu_date) return { error: 'La date est obligatoire.' }
+
+  const { error } = await supabase.from('mnu_menus').insert({
+    label: label.trim(),
+    menu_date,
+    notes: notes?.trim() || null,
+  })
+
+  if (error) return { error: error.message }
+
+  revalidatePath(REVALIDATE_PATH)
+  return { success: 'Menu créé.' }
+}
+
+export async function duplicateMenu(sourceId: string): Promise<ActionState> {
+  const supabase = await createClient()
+
+  // Fetch source menu
+  const { data: source, error: srcErr } = await supabase
+    .from('mnu_menus')
+    .select('*')
+    .eq('id', sourceId)
+    .single()
+
+  if (srcErr || !source) return { error: 'Menu source introuvable.' }
+
+  const today = new Date().toISOString().slice(0, 10)
+
+  const { data: newMenu, error: menuErr } = await supabase
+    .from('mnu_menus')
+    .insert({
+      label: `Copie — ${source.label}`,
+      menu_date: today,
+      notes: source.notes,
+    })
+    .select('id')
+    .single()
+
+  if (menuErr || !newMenu) return { error: menuErr?.message ?? 'Erreur de duplication.' }
+
+  // Copy items
+  const { data: items } = await supabase
+    .from('mnu_menu_items')
+    .select('dish_id, position, is_featured')
+    .eq('menu_id', sourceId)
+
+  if (items && items.length > 0) {
+    const { error: itemsErr } = await supabase.from('mnu_menu_items').insert(
+      items.map((item) => ({
+        menu_id: newMenu.id,
+        dish_id: item.dish_id,
+        position: item.position,
+        is_featured: item.is_featured,
+      })),
+    )
+    if (itemsErr) return { error: itemsErr.message }
+  }
+
+  revalidatePath(REVALIDATE_PATH)
+  return { success: 'Menu dupliqué.' }
+}
+
+export async function deleteMenu(id: string): Promise<ActionState> {
+  const supabase = await createClient()
+  const { error } = await supabase.from('mnu_menus').delete().eq('id', id)
+  if (error) return { error: error.message }
+
+  revalidatePath(REVALIDATE_PATH)
+  return { success: 'Menu supprimé.' }
+}
+
+// ─────────────────────────────────────────────
+// MENU ITEMS
+// ─────────────────────────────────────────────
+
+export async function addDishToMenu(menuId: string, dishId: string): Promise<ActionState> {
+  const supabase = await createClient()
+
+  // Get the dish category to calculate next position within category
+  const { data: dish } = await supabase
+    .from('mnu_dishes')
+    .select('category')
+    .eq('id', dishId)
+    .single()
+
+  if (!dish) return { error: 'Plat introuvable.' }
+
+  // Find max position within same category in this menu
+  const { data: existing } = await supabase
+    .from('mnu_menu_items')
+    .select('position, mnu_dishes!inner(category)')
+    .eq('menu_id', menuId)
+    .eq('mnu_dishes.category', dish.category)
+    .order('position', { ascending: false })
+    .limit(1)
+
+  const nextPosition = existing && existing.length > 0 ? (existing[0].position as number) + 1 : 0
+
+  const { error } = await supabase.from('mnu_menu_items').insert({
+    menu_id: menuId,
+    dish_id: dishId,
+    position: nextPosition,
+  })
+
+  if (error) {
+    if (error.code === '23505') return { error: 'Ce plat est déjà dans le menu.' }
+    return { error: error.message }
+  }
+
+  revalidatePath(REVALIDATE_PATH)
+  return null
+}
+
+export async function removeDishFromMenu(itemId: string): Promise<ActionState> {
+  const supabase = await createClient()
+  const { error } = await supabase.from('mnu_menu_items').delete().eq('id', itemId)
+  if (error) return { error: error.message }
+
+  revalidatePath(REVALIDATE_PATH)
+  return null
+}
+
+export async function moveItemUp(itemId: string): Promise<ActionState> {
+  return _swapItems(itemId, 'up')
+}
+
+export async function moveItemDown(itemId: string): Promise<ActionState> {
+  return _swapItems(itemId, 'down')
+}
+
+async function _swapItems(itemId: string, direction: 'up' | 'down'): Promise<ActionState> {
+  const supabase = await createClient()
+
+  // Fetch current item + its dish category
+  const { data: item } = await supabase
+    .from('mnu_menu_items')
+    .select('id, menu_id, position, dish:mnu_dishes(category)')
+    .eq('id', itemId)
+    .single()
+
+  if (!item) return { error: 'Item introuvable.' }
+
+  const category = (item.dish as unknown as { category: DishCategory }).category
+
+  // Fetch all items in same category, ordered by position
+  const { data: siblings } = await supabase
+    .from('mnu_menu_items')
+    .select('id, position, dish:mnu_dishes!inner(category)')
+    .eq('menu_id', item.menu_id)
+    .eq('mnu_dishes.category', category)
+    .order('position')
+
+  if (!siblings) return null
+
+  const idx = siblings.findIndex((s) => s.id === itemId)
+  const targetIdx = direction === 'up' ? idx - 1 : idx + 1
+
+  if (targetIdx < 0 || targetIdx >= siblings.length) return null
+
+  const current = siblings[idx]
+  const target = siblings[targetIdx]
+
+  // Swap positions
+  await supabase.from('mnu_menu_items').update({ position: target.position }).eq('id', current.id)
+  await supabase.from('mnu_menu_items').update({ position: current.position }).eq('id', target.id)
+
+  revalidatePath(REVALIDATE_PATH)
+  return null
+}
+
+export async function toggleFeatured(itemId: string, currentValue: boolean): Promise<ActionState> {
+  const supabase = await createClient()
+  const { error } = await supabase
+    .from('mnu_menu_items')
+    .update({ is_featured: !currentValue })
+    .eq('id', itemId)
+
+  if (error) return { error: error.message }
+
+  revalidatePath(REVALIDATE_PATH)
+  return null
+}

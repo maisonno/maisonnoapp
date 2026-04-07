@@ -67,7 +67,7 @@ Cela évite les collisions et permet d'identifier l'origine d'une table au premi
 | link-saver | `lnk_` | `lnk_links`, `lnk_tags` |
 | habit-tracker | `hbt_` | `hbt_habits`, `hbt_entries` |
 | notes | `nts_` | `nts_notes`, `nts_folders` |
-| _(à définir)_ | `xxx_` | — |
+| menu-management | `mnu_` | `mnu_dishes`, `mnu_menus`, `mnu_menu_items`, `mnu_generated_docs` |
 
 **Règle :** choisir un préfixe qui n'est pas encore utilisé. Le tenir à jour dans ce tableau.
 
