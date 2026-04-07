@@ -157,11 +157,22 @@ export async function POST(request: Request) {
     const doc = new Docxtemplater(zip, {
       paragraphLoop: true,
       linebreaks: true,
+      // Return empty string for unknown tags instead of throwing
+      nullGetter: () => '',
     })
     doc.render(templateData)
     docxBuffer = doc.getZip().generate({ type: 'nodebuffer', compression: 'DEFLATE' })
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Erreur docxtemplater.'
+    // docxtemplater throws a structured multi-error — extract details
+    let message = 'Erreur docxtemplater.'
+    if (err && typeof err === 'object' && 'properties' in err) {
+      const props = (err as { properties?: { errors?: Array<{ message: string }> } }).properties
+      if (props?.errors?.length) {
+        message = props.errors.map((e) => e.message).join(' | ')
+      }
+    } else if (err instanceof Error) {
+      message = err.message
+    }
     return NextResponse.json({ error: `Erreur génération DOCX : ${message}` }, { status: 500 })
   }
 
