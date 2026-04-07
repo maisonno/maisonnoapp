@@ -83,11 +83,40 @@ export async function POST(request: Request) {
     })
     .filter(Boolean)
 
+  // Helper : liste de plats pour une catégorie donnée
+  const dishesForCat = (cat: string) =>
+    items
+      .filter((i) => i.dish.category === cat)
+      .map((i) => ({
+        name: i.dish.name,
+        description: i.dish.description ?? '',
+        price: i.dish.price !== null ? `${Number(i.dish.price).toFixed(2)} €` : '',
+        is_featured: i.is_featured,
+      }))
+
   const templateData = {
     menu_label: menu.label,
     menu_date: menuDate,
     notes: menu.notes ?? '',
+    // Boucle générique toutes catégories
     categories,
+    // Variables par catégorie (utiliser directement dans le template)
+    entrees:    dishesForCat('entree'),
+    a_partager: dishesForCat('a_partager'),
+    plats:      dishesForCat('plat'),
+    pizzas:     dishesForCat('pizza'),
+    salades:    dishesForCat('salade'),
+    desserts:   dishesForCat('dessert'),
+    glaces:     dishesForCat('glace'),
+    // Drapeaux booléens (pour affichage conditionnel)
+    has_entrees:    items.some((i) => i.dish.category === 'entree'),
+    has_a_partager: items.some((i) => i.dish.category === 'a_partager'),
+    has_plats:      items.some((i) => i.dish.category === 'plat'),
+    has_pizzas:     items.some((i) => i.dish.category === 'pizza'),
+    has_salades:    items.some((i) => i.dish.category === 'salade'),
+    has_desserts:   items.some((i) => i.dish.category === 'dessert'),
+    has_glaces:     items.some((i) => i.dish.category === 'glace'),
+    // Plats mis en avant
     featured_dishes: items
       .filter((i) => i.is_featured)
       .map((i) => ({
