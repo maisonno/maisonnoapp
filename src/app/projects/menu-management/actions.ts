@@ -115,9 +115,8 @@ export async function importDishesFromCsv(
   }
 
   const supabase = await createClient()
-  const { error } = await supabase.from('mnu_dishes').upsert(
+  const { error } = await supabase.from('mnu_dishes').insert(
     rows.map((r) => ({ ...r })),
-    { onConflict: 'name' },
   )
 
   if (error) return { error: error.message }
