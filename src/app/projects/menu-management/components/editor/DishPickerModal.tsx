@@ -9,13 +9,14 @@ type Props = {
   menuId: string
   assignedDishIds: Set<string>
   dishes: Dish[]
+  defaultCategory?: DishCategory
   onClose: () => void
 }
 
-export default function DishPickerModal({ menuId, assignedDishIds, dishes, onClose }: Props) {
+export default function DishPickerModal({ menuId, assignedDishIds, dishes, defaultCategory, onClose }: Props) {
   const [isPending, startTransition] = useTransition()
   const [search, setSearch] = useState('')
-  const [filterCategory, setFilterCategory] = useState<DishCategory | 'all'>('all')
+  const [filterCategory, setFilterCategory] = useState<DishCategory | 'all'>(defaultCategory ?? 'all')
 
   const available = dishes.filter((d) => {
     if (assignedDishIds.has(d.id)) return false
@@ -50,12 +51,12 @@ export default function DishPickerModal({ menuId, assignedDishIds, dishes, onClo
             placeholder="Rechercher…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="flex-1 rounded-md border border-gray-300 px-3 py-1.5 text-sm focus:border-blue-500 focus:outline-none"
+            className="flex-1 rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-900 focus:border-blue-500 focus:outline-none"
           />
           <select
             value={filterCategory}
             onChange={(e) => setFilterCategory(e.target.value as DishCategory | 'all')}
-            className="rounded-md border border-gray-300 px-3 py-1.5 text-sm focus:border-blue-500 focus:outline-none"
+            className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-900 focus:border-blue-500 focus:outline-none"
           >
             <option value="all">Toutes</option>
             {CATEGORY_ORDER.map((cat) => (

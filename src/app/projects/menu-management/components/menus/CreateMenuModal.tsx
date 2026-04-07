@@ -9,6 +9,16 @@ type Props = {
 }
 
 const initialState: ActionState = null
+const inputCls = 'w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500'
+
+function defaultLabel() {
+  return new Date().toLocaleDateString('fr-FR', {
+    weekday: undefined,
+    day: '2-digit',
+    month: 'long',
+    year: 'numeric',
+  }).replace(/^(\d+)\s/, (_, d) => `Menu du ${parseInt(d)} `)
+}
 
 export default function CreateMenuModal({ onClose }: Props) {
   const [state, formAction, isPending] = useActionState(createMenu, initialState)
@@ -33,9 +43,9 @@ export default function CreateMenuModal({ onClose }: Props) {
             <input
               type="text"
               name="label"
-              placeholder="ex. Menu du midi"
+              defaultValue={defaultLabel()}
               required
-              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className={inputCls}
             />
           </div>
 
@@ -46,7 +56,7 @@ export default function CreateMenuModal({ onClose }: Props) {
               name="menu_date"
               defaultValue={today}
               required
-              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className={inputCls}
             />
           </div>
 
@@ -55,7 +65,7 @@ export default function CreateMenuModal({ onClose }: Props) {
             <textarea
               name="notes"
               rows={2}
-              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className={inputCls}
             />
           </div>
 

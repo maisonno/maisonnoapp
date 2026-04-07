@@ -11,6 +11,7 @@ type Props = {
 }
 
 const initialState: ActionState = null
+const inputCls = 'w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500'
 
 export default function DishFormModal({ onClose, dish }: Props) {
   const action = dish ? updateDish : createDish
@@ -43,7 +44,7 @@ export default function DishFormModal({ onClose, dish }: Props) {
               name="name"
               defaultValue={dish?.name}
               required
-              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className={inputCls}
             />
           </div>
 
@@ -53,7 +54,7 @@ export default function DishFormModal({ onClose, dish }: Props) {
               name="description"
               defaultValue={dish?.description ?? ''}
               rows={2}
-              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className={inputCls}
             />
           </div>
 
@@ -66,7 +67,7 @@ export default function DishFormModal({ onClose, dish }: Props) {
                 defaultValue={dish?.price ?? ''}
                 step="0.5"
                 min="0"
-                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                className={inputCls}
               />
             </div>
 
@@ -75,7 +76,7 @@ export default function DishFormModal({ onClose, dish }: Props) {
               <select
                 name="category"
                 defaultValue={dish?.category ?? 'plat'}
-                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                className={inputCls}
               >
                 {CATEGORY_ORDER.map((cat) => (
                   <option key={cat} value={cat}>{CATEGORY_LABELS[cat as DishCategory]}</option>

@@ -15,7 +15,8 @@ export default function DishCard({ dish }: Props) {
   const [editing, setEditing] = useState(false)
   const [isPending, startTransition] = useTransition()
 
-  const handleDelete = () => {
+  const handleDelete = (e: React.MouseEvent) => {
+    e.stopPropagation()
     if (!confirm(`Supprimer « ${dish.name} » ?`)) return
     startTransition(async () => {
       const result = await deleteDish(dish.id)
@@ -25,7 +26,10 @@ export default function DishCard({ dish }: Props) {
 
   return (
     <>
-      <div className={`flex items-center gap-3 rounded-lg border bg-white px-4 py-3 shadow-sm transition-opacity ${isPending ? 'opacity-50' : ''}`}>
+      <div
+        onClick={() => setEditing(true)}
+        className={`flex cursor-pointer items-center gap-3 rounded-lg border bg-white px-4 py-3 shadow-sm transition-all hover:bg-gray-50 hover:shadow-md ${isPending ? 'opacity-50' : ''}`}
+      >
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <span className="font-medium text-gray-800 truncate">{dish.name}</span>
@@ -43,15 +47,8 @@ export default function DishCard({ dish }: Props) {
           </div>
         </div>
 
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center gap-2 shrink-0" onClick={(e) => e.stopPropagation()}>
           <DishToggleActive id={dish.id} isActive={dish.is_active} />
-          <button
-            onClick={() => setEditing(true)}
-            className="rounded-md p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
-            title="Modifier"
-          >
-            <PencilIcon />
-          </button>
           <button
             onClick={handleDelete}
             disabled={isPending}
@@ -65,14 +62,6 @@ export default function DishCard({ dish }: Props) {
 
       {editing && <DishFormModal dish={dish} onClose={() => setEditing(false)} />}
     </>
-  )
-}
-
-function PencilIcon() {
-  return (
-    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-      <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
-    </svg>
   )
 }
 
