@@ -88,6 +88,15 @@ export async function POST(request: Request) {
     menu_date: menuDate,
     notes: menu.notes ?? '',
     categories,
+    featured_dishes: items
+      .filter((i) => i.is_featured)
+      .map((i) => ({
+        name: i.dish.name,
+        description: i.dish.description ?? '',
+        price: i.dish.price !== null ? `${Number(i.dish.price).toFixed(2)} €` : '',
+        category: CATEGORY_LABELS[i.dish.category as keyof typeof CATEGORY_LABELS],
+      })),
+    has_featured: items.some((i) => i.is_featured),
     all_dishes: items.map((i) => ({
       name: i.dish.name,
       description: i.dish.description ?? '',
