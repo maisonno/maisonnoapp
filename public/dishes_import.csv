@@ -1,0 +1,123 @@
+nom,description,prix,categorie,actif
+Poulet chasseur,"Filet de poulet, champignons, sauce tomate, estragon, servi avec un gratin dauphinois",23,plat,oui
+La Paella,"Riz rond, crevettes, gambas, poulet, chorizo, poivrons rouges, ail et persil, lamelles d'encornets, moules, bouillon maison.",23,plat,oui
+Le Curry vert Thai au poulet,Curry vert au poulet servi avec du riz Thaï,21,plat,oui
+La Moule du chef,"Moules marinières, échalotes, ail et persil, vin blanc, crème. Servies avec nos frites maisons.",19,plat,oui
+Lasagnes de boeuf,Lasagne bolognaise de bœuf,21,plat,oui
+Le Veau,"Veau sauce tomate au vin blanc, champignons, servi avec un écrasé de pomme de terre.",23,plat,non
+Rôti de cochon,"Rôti, sauce crémée aux champignons de paris, servi avec un gratin de choux fleur",21,plat,oui
+les Gambas,"Gambas à la plancha, persillade, servi avec un riz à l'espagnole.",23,plat,oui
+Le Dos de Cabillaud,"Cabillaud cuit en court bouillon, sauce façon hollandaise à l'estragon, servi avec du quinoa.",23,plat,oui
+Penne Rigata,"Penne rigata, ricotta, tomates cerises confites, pesto de roquette, parmesan.",19,plat,oui
+Le Burger Campagnard,"Pain du Boulanger, compotée d'oignons, lard fumé, steak haché, sauce cheddar reblochon servi avec nos frites.",21,plat,non
+Entrecôte Simmental,"Entrecôte Simmental, beurre maître d'hôtel, servie avec nos frites.",25,plat,non
+Burger Catalan,"Pain du boulanger, steak haché façon bouchère, tapenade, poivrons grillés, oignons confits, chorizo, cheddar, servi avec nos frites.",21,plat,oui
+Terre et Mer,"Daube de poulpito, joues de cochon, lard, servi avec de la polenta.",23,plat,oui
+La Lasagne,"Lasagne épinard ricotta, servie avec de la salade.",19,plat,non
+Joue de cochon,"Joue de cochon sauce olives vertes, champignons de Paris, carottes, servi avec des gnocchis.",21,plat,oui
+La Brandade,"Purée de pommes de terre en persillade, cabillaud, servie avec de la salade.",21,plat,non
+Poivron farci,"Poivron farci à la chair à saucisse servi avec un riz pilaf.",19,plat,non
+Le Burger de la mer,"Pain du boulanger, cabillaud en persillade, poêlée de fenouil et oignons blancs, salicorne, sauce fromage blanc citronnée, servi avec nos frites maison double cuisson et de la salade.",21,plat,oui
+Le Burger Italien,"Pain du Boulanger, steak angus, oignons confits en sauce tomate, jambon cru, pesto, crème de parmesan, servi avec nos frites.",21,plat,oui
+Tajine de poulet,"Tajine de poulet aux citrons confits, olives vertes, courgettes et fenouil, servi avec de la semoule.",21,plat,non
+Le Parmentier,"Parmentier de bœuf angus, purée de pommes de terre.",19,plat,non
+Tajine d'agneau aux olives vertes,"Agneau, olives vertes, citrons confits, courgettes, épices, menthe et persil, servi avec de la semoule.",23,plat,oui
+L'Encornet,"Tagliatelles d'encornets, salicorne aillée, servi avec un riz pilaf à l'encre.",23,plat,non
+Lapin à la moutarde,"Cuisse de lapin sauce moutarde à l'ancienne, servi avec une purée pomme de terre carotte.",23,plat,oui
+La Pluma façon asiatique,"Pluma de cochon marinée au soja, gingembre, ail, snackée à la plancha. Servie avec un riz thai.",23,plat,oui
+La Saucisse de Toulouse,"Saucisse de Toulouse servie avec une purée de pomme de terre, sauce moutarde à l'ancienne.",19,plat,non
+Moussaka,,21,plat,non
+Burger Franchouillard,"Pain du Boulanger, steak angus, poêlée d'oignons, sauce camembert, rosette, servi avec nos frites.",21,plat,non
+Le Parmentier de sanglier,Parmentier de daube de sanglier.,21,plat,non
+Le Risotto,"Risotto de la mer, moules, gambas, encornets, salicorne, parmesan.",23,plat,oui
+La Dorade,"Dorade entière, sauce vierge, servie avec du quinoa épinard et salicorne.",23,plat,non
+Le Travers de Cochon,"Travers de cochon, sauce tex mex, servi avec des pommes de terre au four.",24,plat,non
+Le Lapin,"Râble de lapin farci à la viande hachée, lardé, servi avec des gnocchis sauce aux olives vertes.",23,plat,non
+La Polenta,"Polenta crémeuse bisque de gambas maison, salicorne.",24,plat,non
+Le Cochon,"Joues de cochon sauce olives vertes, carottes, oignons, champignons de Paris, servie avec des gnocchis.",21,plat,non
+L'Osso Bucco,"Jarret de veau, sauce tomate servi avec des pipe rigate.",23,plat,non
+Le Maquereau,"Filet de maquereau cuisson uni-latérale, sauce vierge à l'huile fumée servi avec du quinoa à la salicorne.",21,plat,oui
+Le Poulet,"Cuisse de poulet servie avec nos frites.",19,plat,non
+Le Filet de Poulet à la Toscane,"Filet de poulet à l'Italienne, sauce tomate, échalotes, olives noires, champignons de Paris, servi avec de la polenta.",23,plat,oui
+Assiette de la mer,"Gambas, dos de cabillaud, servis dans une bisque de gambas maison, pommes de terre, sauce salicorne à l'ail.",24,plat,non
+La Sardine,"Sardines farcies avec une sauce vierge servies avec du sarrasin en persillade.",19,plat,non
+Le Travers de Cochon Fermier,"Travers de cochon cuisson basse température, sauce tex-mex maison, servi avec des pommes de terre grenaille.",24,plat,non
+Les Farcis,"Poivron rouge farci servi avec du quinoa en persillade.",19,plat,non
+Les Linguine,"Linguine à la crème de parmesan, courgettes poêlées.",16,plat,non
+L'assiette du Pêcheur,"Bisque de gambas maison, gambas, dos de cabillaud, persillade, servie avec des pommes de terre.",25,plat,non
+Le Fish,"Dos de Cabillaud en chapelure, sauce tartare, servie avec des frites.",23,plat,non
+La Souris,"Souris d'agneau cuisson à basse température, crème d'ail, servie avec une polenta infusée au romarin du Levant.",24,plat,oui
+Le Gratin de Pasta,"Orecchiette gratinés à la crème, lardons, oignons et mozzarella.",17,plat,non
+Poulet Tandori,"Cuisse de poulet, riz, dahl de lentilles corail, palak, raita de concombres.",21,plat,non
+Le Poulpe,"Poulpes à la sauce tomate, servi avec un riz pilaf à l'encre de seiche.",21,plat,non
+Esquixade de morue,"Morue servie froide accompagnée de légumes du soleil et de quinoa.",21,plat,non
+Plat du Joüy,"Chiffonnade de bœuf mi-crue, inspirée du couscous (semoule, oignons, courgettes, tomates, pois chiches).",24,plat,non
+Gratin de gnocchis aux épinards,"Gnocchis, épinards, béchamel, mozzarella.",17,plat,non
+Pinsa Minorque,"Sauce tomate, mozzarella, origan",14,pizza,oui
+Pinsa Stromboli,"Sauce tomate, mozzarella, chorizo",16,pizza,oui
+Pinsaladière,,18,pizza,non
+Pinsa Mykonos,,18,pizza,non
+Tomate burrata,"Tomate et burrata",10,entree,non
+Carpaccio de Tomate de Crimée,"Supplément burratina (+5€)",8,entree,non
+Le Fenouil,"Salade fenouil avec suprême d'orange, vinaigrette à l'orange, noix et ciboulette.",8,entree,non
+L'Anchois,"Anchois à l'ail et citron confit",8,entree,non
+Le Velouté de céleri rave,"Velouté de céleri rave à l'huile fumée. En option : Œuf parfait bio +4€",8,entree,non
+Le Velouté de petits pois,Velouté de petits pois infusés à la menthe.,8,entree,non
+Le Haricot,Salade de haricots blancs en persillade.,8,entree,non
+La Terrine,"Au choix : Terrine de Campagne ou terrine de sanglier.",8,entree,non
+L'Œuf Parfait,"Œuf parfait, velouté de courgettes et parmesan.",8,entree,non
+Oeuf mimosa,Œuf bio mimosa servi sur un lit de salade.,8,entree,non
+La Gambas,Gambas citronnées à la salicorne.,9,entree,non
+Bisque de gambas maison façon soupe de poisson,"Bisque, croûtons, aïoli, gruyère.",8,entree,non
+Le Tartare,"Tartare de bœuf, huile d'olive, pesto de basilic, tomates, parmesan, basilic, roquette.",9,entree,non
+Les tartinables,Tapenade et caviar d'aubergine.,8,entree,non
+Esquixade de morue en entrée,"Morue façon tartare, sauce vierge, salade.",8,entree,non
+Les Rillettes de cabillaud,Les rillettes de cabillaud en persillade.,8,entree,non
+Cannelés aux olives,Cannelés aux olives vertes et noires.,8,entree,non
+Le Melon au Jambon,"Melon et jambon cru Italien, huile d'olive.",8,entree,non
+Le Duo du Joüy,"Terrine d'aubergine, champignons de Paris et shitake, Panacotta lard et son coulis poivron romarin.",8,entree,non
+Le Mini Bol,"Lentilles, Petit Épeautre, œuf parfait, légumes cuits et crus, graines.",0,entree,non
+Le Bol du Jardin,"Lentilles, petit épeautre, légumes cuits, œuf parfait, mélanges de graines, légumes crus.",19,salade,non
+La Salade Italienne,"Mélange de salades vertes, roquette, jambon cru, tomates, burrata, parmesan, pesto, croûtons. Vinaigrette maison à la roquette.",19,salade,non
+La Salade Grecque,"Mélange de salades vertes, féta, concombre, olives noires, oignons rouges, tomates.",16,salade,non
+Les Pokes,"Buddha (100% végétal), Parfait (avec un œuf parfait) ou Dorade (avec de la Dorade cru citronnée). Base de riz à sushi assaisonné.",15,salade,non
+Mascaron,"Mousse de mascarpone à la crème de marron, éclats de spéculos.",7,dessert,non
+Le Délice d'Orange,"Sorbet orange sur son matelas de pancake à la mandarine Napoléon, couvert de chantilly.",7,dessert,non
+La Mousse au Chocolat,Mousse chocolat au piment d'Espelette.,9,dessert,non
+Le Crumble,Crumble de pommes caramel et sablé amandes.,8,dessert,non
+Le Citron,Verrine mousse citron meringuée.,7,dessert,non
+Le Tiramisu à la réglisse,"Café, spéculoos, réglisse, mascarpone.",7,dessert,non
+Le Fondant aux pommes,"Pommes fondantes caramelisées, crème anglaise vanillée.",7,dessert,non
+Le Cheese cake,Cheese cake au coulis de framboises sur une base spéculoos.,8,dessert,non
+Le Paris-Levant,"Pâte à Choux, crème praliné avec son croustillant.",9,dessert,non
+Les Choux,Trio de choux au caramel.,8,dessert,non
+Le Basboussa,Semoule Coco Miel au Lait de Coco et Fleur d'Oranger.,8,dessert,non
+La Dacquoise,"Dacquoise noisette, mousse praliné, citron confit maison.",9,dessert,non
+Le Café Gourmand,Café ou déca avec 3 mini desserts.,9,dessert,non
+La Praliné,Biscuit cuillère et mousse praliné.,7,dessert,non
+Le Moelleux,Moelleux pistache framboise.,7,dessert,non
+La Pomme d'Adam,"Mousse vanille, cœur compotée de pommes caramelisées.",8,dessert,non
+Le Fondant au chocolat,"Fondant chocolat, crème anglaise à la vanille.",8,dessert,non
+Le Rainbow cake,"Biscuit joconde, crème pâtissière vanillée.",8,dessert,non
+La Mousse Mojito,Mousse citron version mojito.,7,dessert,non
+Le Brownie,Brownie aux noix sur un coulis de fruit rouge.,8,dessert,non
+Le Framboisier,"Biscuit fin, crème mousseline et framboises.",8,dessert,non
+Le Coco Banane,"Biscuit, bananes rôties, croustillant coco.",8,dessert,non
+Moelleux aux pommes,Moelleux avec son anglaise caramel maison.,7,dessert,non
+Tarte poire,"Pâte brisée, poire, cannelle, œufs, crème.",8,dessert,non
+La Verrine Praliné Citron,"Crème diplomate (pâtissière et chantilly) et son coulis chocolat au lait.",8,dessert,non
+La Tarte au Citron,Tarte citron meringuée.,8,dessert,non
+Charlotte,Charlotte de framboises.,7,dessert,non
+La Tarte Abricot Nectarine,"Tarte abricot et nectarine, pâte sablée, crème d'amande et éclats de pistaches.",8,dessert,non
+Panacotta,"Panacotta vanille, compotée d'abricots.",7,dessert,non
+Profiteroles,,9,dessert,non
+Le Clafoutis Framboises,"Clafoutis, framboises, mascarpone, sucre vanillée.",7,dessert,non
+Ricotta à la framboise,"Ricotta, framboises, chantilly, poudre de spéculoos, coulis de framboises.",7,dessert,non
+Mousse de spéculoos,"Crème de spéculoos, mascarpone, blanc en neige.",7,dessert,non
+Dame Blanche,"Glace vanille bio, sauce chocolat, éclats de cookies, chantilly.",8,glace,non
+The Marble Lady,"Glace vanille/chocolat, sauce chocolat, éclats de cookies, chantilly.",8,glace,non
+Les 2 boules,"2 boules au choix. Glace : vanille, fraise, rhum-raisin, menthe-choco. Sorbet : citron, orange.",5,glace,non
+Le Colonel,2 boules de sorbet citron et shot de vodka.,12,glace,non
+L'Irish Coffee,"Expresso, whisky, chantilly et amour.",12,glace,non
+La Route du Rhum,"2 boules de glace rhum raisin, chocolat, chantilly et raisins secs imbibés de rhum. Supplément : shot de Rhum ambré +4€.",8,glace,non
+La Coupe Fraicheur,"Boule de citron de Sicile, boule d'orange, meringue et coulis passion.",8,glace,non
