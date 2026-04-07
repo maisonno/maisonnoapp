@@ -166,9 +166,13 @@ export async function POST(request: Request) {
     // docxtemplater throws a structured multi-error — extract details
     let message = 'Erreur docxtemplater.'
     if (err && typeof err === 'object' && 'properties' in err) {
-      const props = (err as { properties?: { errors?: Array<{ message: string }> } }).properties
+      type DtError = { message: string; properties?: { id?: string; xtag?: string; offset?: number } }
+      const props = (err as { properties?: { errors?: DtError[] } }).properties
       if (props?.errors?.length) {
-        message = props.errors.map((e) => e.message).join(' | ')
+        message = props.errors.map((e) => {
+          const tag = e.properties?.xtag ? ` (balise: {${e.properties.xtag}})` : ''
+          return `${e.message}${tag}`
+        }).join(' | ')
       }
     } else if (err instanceof Error) {
       message = err.message
