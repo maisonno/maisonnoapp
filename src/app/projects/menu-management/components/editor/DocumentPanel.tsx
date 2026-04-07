@@ -33,7 +33,7 @@ export default function DocumentPanel({ menuId, docs, templates }: Props) {
         body: JSON.stringify({ menuId, templateId }),
       })
 
-      const data = await res.json() as { error?: string; doc?: GeneratedDoc }
+      const data = await res.json() as { error?: string; doc?: GeneratedDoc; pdf_warning?: string }
 
       if (!res.ok || data.error) {
         setErrors((e) => ({ ...e, [templateId]: data.error ?? 'Erreur de génération.' }))
@@ -44,7 +44,12 @@ export default function DocumentPanel({ menuId, docs, templates }: Props) {
       if (data.doc) {
         setFreshDocs((prev) => [data.doc!, ...prev])
       }
-      setStates((s) => ({ ...s, [templateId]: 'idle' }))
+      if (data.pdf_warning) {
+        setErrors((e) => ({ ...e, [templateId]: `⚠ PDF non généré : ${data.pdf_warning}` }))
+        setStates((s) => ({ ...s, [templateId]: 'error' }))
+      } else {
+        setStates((s) => ({ ...s, [templateId]: 'idle' }))
+      }
     } catch {
       setErrors((e) => ({ ...e, [templateId]: 'Erreur réseau.' }))
       setStates((s) => ({ ...s, [templateId]: 'error' }))

@@ -199,6 +199,7 @@ export async function POST(request: Request) {
 
   // Convert to PDF via Gotenberg
   let pdfStoragePathFinal: string | null = null
+  let pdfWarning: string | null = null
   const gotenbergUrl = process.env.GOTENBERG_URL
 
   if (gotenbergUrl) {
@@ -225,11 +226,18 @@ export async function POST(request: Request) {
 
         if (!pdfUploadErr) {
           pdfStoragePathFinal = pdfStoragePath
+        } else {
+          pdfWarning = `Upload PDF : ${pdfUploadErr.message}`
         }
+      } else {
+        const body = await gotenbergRes.text()
+        pdfWarning = `Gotenberg ${gotenbergRes.status} : ${body.slice(0, 200)}`
       }
-    } catch {
-      // PDF generation failed — continue without PDF (DOCX still available)
+    } catch (e) {
+      pdfWarning = `Gotenberg inaccessible : ${e instanceof Error ? e.message : String(e)}`
     }
+  } else {
+    pdfWarning = 'GOTENBERG_URL non configuré.'
   }
 
   // Generate signed URLs (48h)
@@ -262,5 +270,5 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: `DB insert : ${dbErr.message}` }, { status: 500 })
   }
 
-  return NextResponse.json({ doc: docRecord })
+  return NextResponse.json({ doc: docRecord, pdf_warning: pdfWarning })
 }
