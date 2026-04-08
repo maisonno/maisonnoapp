@@ -13,7 +13,7 @@ type Props = {
 }
 
 export const metadata = {
-  title: 'Gestion des Menus — La Pomme d\'Adam',
+  title: 'Menu Pomme — La Pomme d\'Adam',
 }
 
 export default async function MenuManagementPage({ searchParams }: Props) {
@@ -45,7 +45,7 @@ export default async function MenuManagementPage({ searchParams }: Props) {
             ← Accueil
           </Link>
           <span className="text-gray-300">/</span>
-          <h1 className="text-lg font-semibold text-gray-800">Gestion des Menus</h1>
+          <h1 className="text-lg font-semibold text-gray-800">Menu Pomme</h1>
           <span className="text-xs rounded-full bg-amber-100 text-amber-700 px-2 py-0.5 font-medium">
             La Pomme d&apos;Adam
           </span>

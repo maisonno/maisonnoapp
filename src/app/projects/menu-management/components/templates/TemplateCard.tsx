@@ -1,21 +1,17 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { deleteTemplate, updateTemplate } from '../../actions'
+import { deleteTemplate } from '../../actions'
 import type { Template } from '../../lib/types'
+import TemplateEditModal from './TemplateEditModal'
 
 type Props = {
   template: Template
 }
 
-const inputCls = 'w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500'
-
 export default function TemplateCard({ template }: Props) {
   const [editing, setEditing] = useState(false)
-  const [name, setName] = useState(template.name)
-  const [description, setDescription] = useState(template.description ?? '')
   const [isPending, startTransition] = useTransition()
-  const [error, setError] = useState('')
 
   const handleDelete = () => {
     if (!confirm(`Supprimer le modèle « ${template.name} » ?\nLe fichier .docx associé sera aussi supprimé.`)) return
@@ -25,77 +21,45 @@ export default function TemplateCard({ template }: Props) {
     })
   }
 
-  const handleSave = () => {
-    if (!name.trim()) { setError('Le nom est obligatoire.'); return }
-    setError('')
-    startTransition(async () => {
-      const result = await updateTemplate(template.id, name, description)
-      if (result?.error) { setError(result.error); return }
-      setEditing(false)
-    })
-  }
-
-  if (editing) {
-    return (
-      <div className="rounded-lg border bg-white px-4 py-4 shadow-sm space-y-3">
-        <div>
-          <label className="block text-xs font-medium text-gray-600 mb-1">Nom</label>
-          <input type="text" value={name} onChange={(e) => setName(e.target.value)} className={inputCls} />
-        </div>
-        <div>
-          <label className="block text-xs font-medium text-gray-600 mb-1">Description</label>
-          <input type="text" value={description} onChange={(e) => setDescription(e.target.value)} className={inputCls} />
-        </div>
-        {error && <p className="text-xs text-red-600">{error}</p>}
-        <div className="flex gap-2 justify-end">
-          <button onClick={() => { setEditing(false); setName(template.name); setDescription(template.description ?? '') }}
-            className="rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50">
-            Annuler
-          </button>
-          <button onClick={handleSave} disabled={isPending}
-            className="rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50">
-            {isPending ? 'Enregistrement…' : 'Enregistrer'}
-          </button>
-        </div>
-      </div>
-    )
-  }
-
   return (
-    <div className="flex items-center gap-3 rounded-lg border bg-white px-4 py-3 shadow-sm transition-all hover:shadow-md">
-      {/* File icon */}
-      <div className="shrink-0 rounded-lg bg-blue-50 p-2.5">
-        <DocxIcon />
+    <>
+      <div className="flex items-center gap-3 rounded-lg border bg-white px-4 py-3 shadow-sm transition-all hover:shadow-md">
+        {/* File icon */}
+        <div className="shrink-0 rounded-lg bg-blue-50 p-2.5">
+          <DocxIcon />
+        </div>
+
+        <div className="flex-1 min-w-0">
+          <p className="font-semibold text-gray-800">{template.name}</p>
+          {template.description && (
+            <p className="text-xs text-gray-500 mt-0.5">{template.description}</p>
+          )}
+          <p className="text-xs text-gray-400 mt-0.5">
+            {template.storage_path ? '✓ Fichier uploadé' : '⚠ Aucun fichier'}
+          </p>
+        </div>
+
+        <div className="flex items-center gap-1 shrink-0">
+          <button
+            onClick={() => setEditing(true)}
+            className="rounded-md p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+            title="Modifier"
+          >
+            <PencilIcon />
+          </button>
+          <button
+            onClick={handleDelete}
+            disabled={isPending}
+            className="rounded-md p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
+            title="Supprimer"
+          >
+            <TrashIcon />
+          </button>
+        </div>
       </div>
 
-      <div className="flex-1 min-w-0">
-        <p className="font-semibold text-gray-800">{template.name}</p>
-        {template.description && (
-          <p className="text-xs text-gray-500 mt-0.5">{template.description}</p>
-        )}
-        <p className="text-xs text-gray-400 mt-0.5">
-          {template.storage_path ? '✓ Fichier uploadé' : '⚠ Aucun fichier'}
-        </p>
-      </div>
-
-      <div className="flex items-center gap-1 shrink-0">
-        <button
-          onClick={() => setEditing(true)}
-          className="rounded-md p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
-          title="Modifier"
-        >
-          <PencilIcon />
-        </button>
-        <button
-          onClick={handleDelete}
-          disabled={isPending}
-          className="rounded-md p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
-          title="Supprimer"
-        >
-          <TrashIcon />
-        </button>
-      </div>
-    </div>
+      {editing && <TemplateEditModal template={template} onClose={() => setEditing(false)} />}
+    </>
   )
 }
 

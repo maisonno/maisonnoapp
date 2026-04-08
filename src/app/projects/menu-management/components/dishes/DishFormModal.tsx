@@ -1,7 +1,7 @@
 'use client'
 
-import { useActionState, useEffect, useRef } from 'react'
-import { createDish, updateDish } from '../../actions'
+import { useActionState, useEffect, useRef, useTransition, useState } from 'react'
+import { createDish, updateDish, archiveDish } from '../../actions'
 import type { ActionState, Dish, DishCategory } from '../../lib/types'
 import { CATEGORY_ORDER, CATEGORY_LABELS } from '../../lib/types'
 
@@ -17,12 +17,23 @@ export default function DishFormModal({ onClose, dish }: Props) {
   const action = dish ? updateDish : createDish
   const [state, formAction, isPending] = useActionState(action, initialState)
   const formRef = useRef<HTMLFormElement>(null)
+  const [isArchiving, startArchiveTransition] = useTransition()
+  const [isActive, setIsActive] = useState(dish?.is_active ?? true)
 
   useEffect(() => {
     if (state?.success) {
       onClose()
     }
   }, [state, onClose])
+
+  const handleArchive = () => {
+    if (!dish) return
+    const willArchive = isActive
+    startArchiveTransition(async () => {
+      await archiveDish(dish.id, willArchive)
+      setIsActive(!willArchive)
+    })
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
@@ -85,18 +96,28 @@ export default function DishFormModal({ onClose, dish }: Props) {
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              id="is_active"
-              name="is_active"
-              value="true"
-              defaultChecked={dish?.is_active ?? true}
-              className="h-4 w-4 rounded border-gray-300 text-blue-600"
-            />
-            <input type="hidden" name="is_active" value="false" />
-            <label htmlFor="is_active" className="text-sm text-gray-700">Au menu (actif)</label>
-          </div>
+          {/* Hidden is_active — kept in sync via archiveDish action */}
+          <input type="hidden" name="is_active" value={isActive ? 'true' : 'false'} />
+
+          {dish && (
+            <div className="flex items-center justify-between rounded-md border border-gray-200 bg-gray-50 px-3 py-2">
+              <span className="text-sm text-gray-600">
+                Statut : <span className={isActive ? 'text-green-700 font-medium' : 'text-gray-400 font-medium'}>{isActive ? 'Actif' : 'Archivé'}</span>
+              </span>
+              <button
+                type="button"
+                onClick={handleArchive}
+                disabled={isArchiving}
+                className={`rounded-md px-3 py-1 text-xs font-medium transition-colors disabled:opacity-50 ${
+                  isActive
+                    ? 'bg-amber-100 text-amber-700 hover:bg-amber-200'
+                    : 'bg-green-100 text-green-700 hover:bg-green-200'
+                }`}
+              >
+                {isArchiving ? '…' : isActive ? 'Archiver' : 'Désarchiver'}
+              </button>
+            </div>
+          )}
 
           {state?.error && (
             <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{state.error}</p>

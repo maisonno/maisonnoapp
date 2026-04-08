@@ -1,6 +1,7 @@
 'use client'
 
 import { useTransition } from 'react'
+import { useRouter } from 'next/navigation'
 import { duplicateMenu, deleteMenu } from '../../actions'
 
 type Props = {
@@ -10,11 +11,15 @@ type Props = {
 
 export default function MenuActions({ menuId, menuLabel }: Props) {
   const [isPending, startTransition] = useTransition()
+  const router = useRouter()
 
   const handleDuplicate = () => {
     startTransition(async () => {
       const result = await duplicateMenu(menuId)
-      if (result?.error) alert(result.error)
+      if (result?.error) { alert(result.error); return }
+      if (result?.newMenuId) {
+        router.push(`/projects/menu-management/${result.newMenuId}`)
+      }
     })
   }
 
@@ -27,14 +32,14 @@ export default function MenuActions({ menuId, menuLabel }: Props) {
   }
 
   return (
-    <div className="flex items-center gap-1">
+    <div className="flex items-center gap-2">
       <button
         onClick={handleDuplicate}
         disabled={isPending}
-        title="Dupliquer (date = aujourd'hui)"
-        className="rounded-md p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600 disabled:opacity-50"
+        className="rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-100 disabled:opacity-50 flex items-center gap-1.5"
       >
         <CopyIcon />
+        {isPending ? 'Duplication…' : 'Dupliquer'}
       </button>
       <button
         onClick={handleDelete}

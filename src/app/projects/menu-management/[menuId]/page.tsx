@@ -2,6 +2,7 @@ import { redirect, notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { getMenuWithItems, getDishes, getGeneratedDocs, getTemplates } from '../lib/queries'
 import MenuEditorClient from '../components/editor/MenuEditorClient'
+import MenuHeaderClient from '../components/editor/MenuHeaderClient'
 import DocumentPanel from '../components/editor/DocumentPanel'
 import Link from 'next/link'
 
@@ -37,14 +38,17 @@ export default async function MenuEditorPage({ params }: Props) {
       <header className="bg-white border-b shadow-sm">
         <div className="mx-auto max-w-4xl px-4 py-4">
           <div className="flex items-center gap-3 mb-1">
-            <Link href="/projects/menu-management" className="text-gray-400 hover:text-gray-600 text-sm">
+            <Link href="/projects/menu-management" className="text-gray-400 hover:text-gray-600 text-sm shrink-0">
               ← Menus
             </Link>
             <span className="text-gray-300">/</span>
-            <h1 className="text-lg font-semibold text-gray-800 truncate">{menu.label}</h1>
+            <MenuHeaderClient
+              menuId={menu.id}
+              label={menu.label}
+              date={formatDate(menu.menu_date)}
+              notes={menu.notes}
+            />
           </div>
-          <p className="text-sm text-gray-500 capitalize">{formatDate(menu.menu_date)}</p>
-          {menu.notes && <p className="text-xs text-gray-400 mt-0.5 italic">{menu.notes}</p>}
         </div>
       </header>
 

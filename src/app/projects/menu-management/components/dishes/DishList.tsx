@@ -11,21 +11,35 @@ type Props = {
   dishes: Dish[]
 }
 
+type Tab = DishCategory | 'all' | 'archived'
+
+const TABS: { key: Tab; label: string }[] = [
+  { key: 'all', label: 'Tous' },
+  { key: 'entree', label: 'Entrées' },
+  { key: 'a_partager', label: 'À partager' },
+  { key: 'plat', label: 'Plats' },
+  { key: 'pizza', label: 'Pizzas' },
+  { key: 'salade', label: 'Salades' },
+  { key: 'dessert', label: 'Desserts' },
+  { key: 'glace', label: 'Glaces' },
+  { key: 'archived', label: 'Archivés' },
+]
+
 export default function DishList({ dishes }: Props) {
   const [showCreate, setShowCreate] = useState(false)
   const [showImport, setShowImport] = useState(false)
-  const [filterCategory, setFilterCategory] = useState<DishCategory | 'all'>('all')
-  const [filterActive, setFilterActive] = useState<'all' | 'active' | 'inactive'>('all')
+  const [activeTab, setActiveTab] = useState<Tab>('all')
   const [search, setSearch] = useState('')
 
   const filtered = dishes.filter((d) => {
-    if (filterCategory !== 'all' && d.category !== filterCategory) return false
-    if (filterActive === 'active' && !d.is_active) return false
-    if (filterActive === 'inactive' && d.is_active) return false
+    if (activeTab === 'archived') return !d.is_active
+    if (!d.is_active) return false
+    if (activeTab !== 'all' && d.category !== activeTab) return false
     if (search && !d.name.toLowerCase().includes(search.toLowerCase())) return false
     return true
   })
 
+  // For "all" tab — group by category. For specific tab — flat list.
   const grouped = CATEGORY_ORDER.reduce<Record<DishCategory, Dish[]>>((acc, cat) => {
     acc[cat] = filtered.filter((d) => d.category === cat)
     return acc
@@ -33,37 +47,44 @@ export default function DishList({ dishes }: Props) {
 
   return (
     <div>
+      {/* Sub-tabs */}
+      <div className="mb-4 overflow-x-auto">
+        <div className="flex gap-1 border-b border-gray-200 min-w-max">
+          {TABS.map((tab) => {
+            const count = tab.key === 'archived'
+              ? dishes.filter((d) => !d.is_active).length
+              : tab.key === 'all'
+              ? dishes.filter((d) => d.is_active).length
+              : dishes.filter((d) => d.is_active && d.category === tab.key).length
+            return (
+              <button
+                key={tab.key}
+                onClick={() => { setActiveTab(tab.key); setSearch('') }}
+                className={`px-3 py-2 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
+                  activeTab === tab.key
+                    ? 'border-blue-600 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-800 hover:border-gray-300'
+                }`}
+              >
+                {tab.label}
+                {count > 0 && (
+                  <span className="ml-1 text-xs text-gray-400">({count})</span>
+                )}
+              </button>
+            )
+          })}
+        </div>
+      </div>
+
       {/* Header */}
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-wrap gap-2">
-          <input
-            type="search"
-            placeholder="Rechercher…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="rounded-md border border-gray-300 px-3 py-1.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-          />
-          <select
-            value={filterCategory}
-            onChange={(e) => setFilterCategory(e.target.value as DishCategory | 'all')}
-            className="rounded-md border border-gray-300 px-3 py-1.5 text-sm focus:border-blue-500 focus:outline-none"
-          >
-            <option value="all">Toutes catégories</option>
-            {CATEGORY_ORDER.map((cat) => (
-              <option key={cat} value={cat}>{CATEGORY_LABELS[cat]}</option>
-            ))}
-          </select>
-          <select
-            value={filterActive}
-            onChange={(e) => setFilterActive(e.target.value as 'all' | 'active' | 'inactive')}
-            className="rounded-md border border-gray-300 px-3 py-1.5 text-sm focus:border-blue-500 focus:outline-none"
-          >
-            <option value="all">Tous les plats</option>
-            <option value="active">Au menu uniquement</option>
-            <option value="inactive">Hors menu</option>
-          </select>
-        </div>
-
+        <input
+          type="search"
+          placeholder="Rechercher…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="rounded-md border border-gray-300 px-3 py-1.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+        />
         <div className="flex gap-2">
           <button
             onClick={() => setShowImport(true)}
@@ -80,30 +101,37 @@ export default function DishList({ dishes }: Props) {
         </div>
       </div>
 
-      {/* Count */}
       <p className="mb-3 text-sm text-gray-500">{filtered.length} plat(s)</p>
 
-      {/* Grouped list */}
-      <div className="space-y-6">
-        {CATEGORY_ORDER.map((cat) => {
-          const items = grouped[cat]
-          if (items.length === 0) return null
-          return (
-            <div key={cat}>
-              <h3 className="mb-2 text-sm font-semibold uppercase tracking-wide text-gray-500">
-                {CATEGORY_LABELS[cat]} ({items.length})
-              </h3>
-              <div className="space-y-2">
-                {items.map((dish) => <DishCard key={dish.id} dish={dish} />)}
+      {/* List */}
+      {activeTab === 'all' || activeTab === 'archived' ? (
+        <div className="space-y-6">
+          {CATEGORY_ORDER.map((cat) => {
+            const items = grouped[cat]
+            if (items.length === 0) return null
+            return (
+              <div key={cat}>
+                <h3 className="mb-2 text-sm font-semibold uppercase tracking-wide text-gray-500">
+                  {CATEGORY_LABELS[cat]} ({items.length})
+                </h3>
+                <div className="space-y-2">
+                  {items.map((dish) => <DishCard key={dish.id} dish={dish} />)}
+                </div>
               </div>
-            </div>
-          )
-        })}
-
-        {filtered.length === 0 && (
-          <p className="py-8 text-center text-sm text-gray-400">Aucun plat trouvé.</p>
-        )}
-      </div>
+            )
+          })}
+          {filtered.length === 0 && (
+            <p className="py-8 text-center text-sm text-gray-400">Aucun plat trouvé.</p>
+          )}
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {filtered.map((dish) => <DishCard key={dish.id} dish={dish} />)}
+          {filtered.length === 0 && (
+            <p className="py-8 text-center text-sm text-gray-400">Aucun plat dans cette catégorie.</p>
+          )}
+        </div>
+      )}
 
       {showCreate && <DishFormModal onClose={() => setShowCreate(false)} />}
       {showImport && <CsvImportModal onClose={() => setShowImport(false)} />}

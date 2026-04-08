@@ -19,6 +19,7 @@ export default function DishPickerModal({ menuId, assignedDishIds, dishes, defau
   const [filterCategory, setFilterCategory] = useState<DishCategory | 'all'>(defaultCategory ?? 'all')
 
   const available = dishes.filter((d) => {
+    if (!d.is_active) return false  // hide archived
     if (assignedDishIds.has(d.id)) return false
     if (filterCategory !== 'all' && d.category !== filterCategory) return false
     if (search && !d.name.toLowerCase().includes(search.toLowerCase())) return false

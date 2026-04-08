@@ -155,7 +155,7 @@ export async function createMenu(
   return { success: 'Menu créé.' }
 }
 
-export async function duplicateMenu(sourceId: string): Promise<ActionState> {
+export async function duplicateMenu(sourceId: string): Promise<ActionState & { newMenuId?: string }> {
   const supabase = await createClient()
 
   // Fetch source menu
@@ -167,13 +167,14 @@ export async function duplicateMenu(sourceId: string): Promise<ActionState> {
 
   if (srcErr || !source) return { error: 'Menu source introuvable.' }
 
-  const today = new Date().toISOString().slice(0, 10)
+  const today = new Date()
+  const label = `Menu du ${today.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}`
 
   const { data: newMenu, error: menuErr } = await supabase
     .from('mnu_menus')
     .insert({
-      label: `Copie — ${source.label}`,
-      menu_date: today,
+      label,
+      menu_date: today.toISOString().slice(0, 10),
       notes: source.notes,
     })
     .select('id')
@@ -200,7 +201,35 @@ export async function duplicateMenu(sourceId: string): Promise<ActionState> {
   }
 
   revalidatePath(REVALIDATE_PATH)
-  return { success: 'Menu dupliqué.' }
+  return { success: 'Menu dupliqué.', newMenuId: newMenu.id }
+}
+
+export async function updateMenuLabel(menuId: string, label: string): Promise<ActionState> {
+  const supabase = await createClient()
+  if (!label.trim()) return { error: 'Le libellé est obligatoire.' }
+  const { error } = await supabase.from('mnu_menus').update({ label: label.trim() }).eq('id', menuId)
+  if (error) return { error: error.message }
+  revalidatePath(REVALIDATE_PATH)
+  return { success: 'Libellé mis à jour.' }
+}
+
+export async function archiveDish(id: string, archived: boolean): Promise<ActionState> {
+  const supabase = await createClient()
+  const { error } = await supabase.from('mnu_dishes').update({ is_active: !archived }).eq('id', id)
+  if (error) return { error: error.message }
+  revalidatePath(REVALIDATE_PATH)
+  return null
+}
+
+export async function reorderMenuItems(orderedItemIds: string[]): Promise<ActionState> {
+  const supabase = await createClient()
+  await Promise.all(
+    orderedItemIds.map((id, idx) =>
+      supabase.from('mnu_menu_items').update({ position: idx }).eq('id', id),
+    ),
+  )
+  revalidatePath(REVALIDATE_PATH)
+  return null
 }
 
 export async function deleteMenu(id: string): Promise<ActionState> {
@@ -343,15 +372,28 @@ export async function createTemplate(name: string, storagePath: string, descript
   return { success: 'Modèle créé.' }
 }
 
-export async function updateTemplate(id: string, name: string, description: string): Promise<ActionState> {
+export async function updateTemplate(
+  id: string,
+  name: string,
+  description: string,
+  newStoragePath?: string,
+  oldStoragePath?: string,
+): Promise<ActionState> {
   const supabase = await createClient()
 
-  const { error } = await supabase
-    .from('mnu_templates')
-    .update({ name: name.trim(), description: description.trim() || null })
-    .eq('id', id)
+  const updateData: Record<string, string | null> = {
+    name: name.trim(),
+    description: description.trim() || null,
+  }
+  if (newStoragePath) updateData.storage_path = newStoragePath
 
+  const { error } = await supabase.from('mnu_templates').update(updateData).eq('id', id)
   if (error) return { error: error.message }
+
+  // Delete old file if replaced
+  if (newStoragePath && oldStoragePath) {
+    await supabase.storage.from('templates').remove([oldStoragePath])
+  }
 
   revalidatePath(REVALIDATE_PATH)
   return { success: 'Modèle mis à jour.' }

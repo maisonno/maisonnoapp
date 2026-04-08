@@ -5,7 +5,6 @@ import { deleteDish } from '../../actions'
 import type { Dish } from '../../lib/types'
 import { CATEGORY_LABELS } from '../../lib/types'
 import DishFormModal from './DishFormModal'
-import DishToggleActive from './DishToggleActive'
 
 type Props = {
   dish: Dish
@@ -28,11 +27,14 @@ export default function DishCard({ dish }: Props) {
     <>
       <div
         onClick={() => setEditing(true)}
-        className={`flex cursor-pointer items-center gap-3 rounded-lg border bg-white px-4 py-3 shadow-sm transition-all hover:bg-gray-50 hover:shadow-md ${isPending ? 'opacity-50' : ''}`}
+        className={`flex cursor-pointer items-center gap-3 rounded-lg border bg-white px-4 py-3 shadow-sm transition-all hover:bg-gray-50 hover:shadow-md ${isPending ? 'opacity-50' : ''} ${!dish.is_active ? 'opacity-60' : ''}`}
       >
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <span className="font-medium text-gray-800 truncate">{dish.name}</span>
+            {!dish.is_active && (
+              <span className="text-xs rounded-full bg-gray-100 text-gray-400 px-2 py-0.5">Archivé</span>
+            )}
           </div>
           {dish.description && (
             <p className="text-xs text-gray-500 mt-0.5 truncate">{dish.description}</p>
@@ -48,7 +50,6 @@ export default function DishCard({ dish }: Props) {
         </div>
 
         <div className="flex items-center gap-2 shrink-0" onClick={(e) => e.stopPropagation()}>
-          <DishToggleActive id={dish.id} isActive={dish.is_active} />
           <button
             onClick={handleDelete}
             disabled={isPending}
