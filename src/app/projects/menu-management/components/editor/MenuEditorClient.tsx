@@ -131,8 +131,10 @@ export default function MenuEditorClient({ menu, allDishes }: Props) {
   const [showCreateDish, setShowCreateDish] = useState(false)
   const [isPending, startTransition] = useTransition()
 
-  // Local state for optimistic reorder — per category
-  const [localItems, setLocalItems] = useState(menu.items)
+  // Local state for optimistic reorder — pre-sorted by position on init
+  const [localItems, setLocalItems] = useState(() =>
+    [...menu.items].sort((a, b) => a.position - b.position),
+  )
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -144,7 +146,7 @@ export default function MenuEditorClient({ menu, allDishes }: Props) {
   const assignedDishIds = new Set(localItems.map((i) => i.dish_id))
 
   const grouped = CATEGORY_ORDER.reduce<Record<DishCategory, typeof localItems>>((acc, cat) => {
-    acc[cat] = localItems.filter((i) => i.dish.category === cat).sort((a, b) => a.position - b.position)
+    acc[cat] = localItems.filter((i) => i.dish.category === cat)  // rely on array order, not position field
     return acc
   }, {} as Record<DishCategory, typeof localItems>)
 
