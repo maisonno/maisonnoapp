@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useState, useTransition, useEffect } from 'react'
 import {
   DndContext,
   closestCenter,
@@ -135,6 +135,30 @@ export default function MenuEditorClient({ menu, allDishes }: Props) {
   const [localItems, setLocalItems] = useState(() =>
     [...menu.items].sort((a, b) => a.position - b.position),
   )
+
+  // Sync fresh dish data from server (e.g. after editing a dish name/price)
+  // while preserving the current drag & drop order
+  useEffect(() => {
+    setLocalItems((prev) => {
+      const freshMap = new Map(menu.items.map((i) => [i.id, i]))
+      const prevIds = new Set(prev.map((i) => i.id))
+
+      // Update dish data + is_featured for existing items, preserve array order
+      const updated = prev
+        .filter((item) => freshMap.has(item.id))
+        .map((item) => {
+          const fresh = freshMap.get(item.id)!
+          return { ...item, dish: fresh.dish, is_featured: fresh.is_featured }
+        })
+
+      // Append items added via the picker (not yet in local state)
+      const added = menu.items
+        .filter((i) => !prevIds.has(i.id))
+        .sort((a, b) => a.position - b.position)
+
+      return [...updated, ...added]
+    })
+  }, [menu.items])
 
   const sensors = useSensors(
     useSensor(PointerSensor),
