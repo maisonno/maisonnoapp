@@ -2,7 +2,6 @@
 
 import { useActionState } from 'react'
 import { login } from '@/app/actions'
-import TikiFace from '@/components/TikiFace'
 
 export default function LoginPage() {
   const [state, formAction, isPending] = useActionState<
@@ -11,48 +10,27 @@ export default function LoginPage() {
   >(login, null)
 
   return (
-    <main className="min-h-screen bg-tiki-bark flex items-center justify-center p-4 relative overflow-hidden">
-      {/* Ambient glow */}
-      <div className="absolute inset-0 bg-gradient-radial from-tiki-wood/20 via-transparent to-transparent pointer-events-none" />
-
-      {/* Torches */}
-      <div
-        className="absolute left-8 top-1/2 -translate-y-1/2 text-5xl animate-flicker select-none hidden md:block"
-        style={{ animationDelay: '0s' }}
-      >
-        🔥
-      </div>
-      <div
-        className="absolute right-8 top-1/2 -translate-y-1/2 text-5xl animate-flicker select-none hidden md:block"
-        style={{ animationDelay: '0.9s' }}
-      >
-        🔥
-      </div>
-
-      <div className="relative w-full max-w-sm">
-        {/* Tiki face */}
-        <div className="flex justify-center mb-5">
-          <TikiFace className="w-24 h-28 drop-shadow-[0_0_12px_rgba(245,166,35,0.4)]" />
+    <main className="min-h-screen bg-slate-950 flex items-center justify-center p-4">
+      <div className="w-full max-w-sm">
+        {/* Header */}
+        <div className="text-center mb-8">
+          <h1 className="text-2xl font-semibold text-white tracking-tight mb-1">
+            maisonno
+          </h1>
+          <p className="text-slate-400 text-sm">Espace personnel</p>
         </div>
 
         {/* Card */}
-        <div className="bg-tiki-wood border border-tiki-bamboo/30 rounded-xl p-8 shadow-2xl shadow-black/60">
-          <h1 className="font-tiki text-tiki-gold text-4xl text-center tracking-widest mb-1">
-            maisonno
-          </h1>
-          <p className="text-tiki-mist/70 text-center text-xs font-body uppercase tracking-widest mb-8">
-            le lounge privé
-          </p>
-
+        <div className="bg-slate-900 border border-slate-800 rounded-xl p-8 shadow-2xl">
           {state?.error && (
-            <div className="mb-5 px-4 py-3 bg-red-950/50 border border-red-700/40 rounded-lg text-red-300 text-sm text-center font-body">
+            <div className="mb-5 px-4 py-3 bg-red-950/60 border border-red-800/50 rounded-lg text-red-400 text-sm">
               {state.error}
             </div>
           )}
 
           <form action={formAction} className="space-y-4">
             <div>
-              <label className="block text-tiki-mist text-xs font-body uppercase tracking-wider mb-2">
+              <label className="block text-slate-300 text-sm font-medium mb-1.5">
                 Email
               </label>
               <input
@@ -60,13 +38,13 @@ export default function LoginPage() {
                 name="email"
                 required
                 autoComplete="email"
-                className="tiki-input"
+                className="input"
                 placeholder="toi@example.com"
               />
             </div>
 
             <div>
-              <label className="block text-tiki-mist text-xs font-body uppercase tracking-wider mb-2">
+              <label className="block text-slate-300 text-sm font-medium mb-1.5">
                 Mot de passe
               </label>
               <input
@@ -74,24 +52,17 @@ export default function LoginPage() {
                 name="password"
                 required
                 autoComplete="current-password"
-                className="tiki-input"
+                className="input"
                 placeholder="••••••••"
               />
             </div>
 
-            <div className="pt-2">
-              <button type="submit" disabled={isPending} className="tiki-btn-primary">
-                {isPending ? 'Connexion…' : 'Entrer dans le lounge'}
+            <div className="pt-1">
+              <button type="submit" disabled={isPending} className="btn-primary">
+                {isPending ? 'Connexion…' : 'Se connecter'}
               </button>
             </div>
           </form>
-        </div>
-
-        {/* Bottom decoration */}
-        <div className="text-center mt-6">
-          <span className="text-tiki-bamboo/30 text-xs font-body tracking-widest">
-            ✦ ✦ ✦
-          </span>
         </div>
       </div>
     </main>

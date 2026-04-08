@@ -1,23 +1,15 @@
 import type { Metadata } from 'next'
-import { Righteous, Lato } from 'next/font/google'
+import { Inter } from 'next/font/google'
 import './globals.css'
 
-const righteous = Righteous({
-  weight: '400',
+const inter = Inter({
   subsets: ['latin'],
-  variable: '--font-tiki',
-  display: 'swap',
-})
-
-const lato = Lato({
-  weight: ['300', '400', '700'],
-  subsets: ['latin'],
-  variable: '--font-body',
+  variable: '--font-inter',
   display: 'swap',
 })
 
 export const metadata: Metadata = {
-  title: 'maisonno — le lounge',
+  title: 'maisonno',
   description: 'Projets perso & expérimentations',
 }
 
@@ -27,7 +19,7 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="fr" className={`${righteous.variable} ${lato.variable}`}>
+    <html lang="fr" className={inter.variable}>
       <body>{children}</body>
     </html>
   )
