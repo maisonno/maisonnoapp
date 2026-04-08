@@ -16,7 +16,16 @@ export default function TemplateList({ templates }: Props) {
     <div>
       <div className="mb-6 rounded-lg bg-blue-50 border border-blue-100 px-4 py-3 text-sm text-blue-700">
         <p className="font-medium mb-1">Comment ça marche</p>
-        <p>Uploadez vos fichiers <strong>.docx</strong> avec les balises <code>{'{plats}'}</code>, <code>{'{desserts}'}</code>… Voir le guide dans la documentation.</p>
+        <p>
+          Uploadez vos fichiers <strong>.docx</strong> avec les balises <code>{'{plats}'}</code>, <code>{'{desserts}'}</code>…{' '}
+          <a
+            href="/docs/templates-guide.md"
+            download="templates-guide.md"
+            className="underline font-medium hover:text-blue-900"
+          >
+            Télécharger le guide ↓
+          </a>
+        </p>
       </div>
 
       <div className="mb-4 flex items-center justify-between">

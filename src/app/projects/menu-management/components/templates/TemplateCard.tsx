@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import { deleteTemplate } from '../../actions'
+import { createClient } from '@/lib/supabase/client'
 import type { Template } from '../../lib/types'
 import TemplateEditModal from './TemplateEditModal'
 
@@ -12,6 +13,25 @@ type Props = {
 export default function TemplateCard({ template }: Props) {
   const [editing, setEditing] = useState(false)
   const [isPending, startTransition] = useTransition()
+  const [isDownloading, setIsDownloading] = useState(false)
+
+  const handleDownload = async () => {
+    if (!template.storage_path) return
+    setIsDownloading(true)
+    try {
+      const supabase = createClient()
+      const { data, error } = await supabase.storage
+        .from('templates')
+        .createSignedUrl(template.storage_path, 60)
+      if (error || !data) { alert('Erreur lors du téléchargement.'); return }
+      const a = document.createElement('a')
+      a.href = data.signedUrl
+      a.download = `${template.name}.docx`
+      a.click()
+    } finally {
+      setIsDownloading(false)
+    }
+  }
 
   const handleDelete = () => {
     if (!confirm(`Supprimer le modèle « ${template.name} » ?\nLe fichier .docx associé sera aussi supprimé.`)) return
@@ -40,6 +60,16 @@ export default function TemplateCard({ template }: Props) {
         </div>
 
         <div className="flex items-center gap-1 shrink-0">
+          {template.storage_path && (
+            <button
+              onClick={handleDownload}
+              disabled={isDownloading}
+              className="rounded-md p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600 disabled:opacity-50"
+              title="Télécharger le fichier .docx"
+            >
+              <DownloadIcon />
+            </button>
+          )}
           <button
             onClick={() => setEditing(true)}
             className="rounded-md p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
@@ -60,6 +90,14 @@ export default function TemplateCard({ template }: Props) {
 
       {editing && <TemplateEditModal template={template} onClose={() => setEditing(false)} />}
     </>
+  )
+}
+
+function DownloadIcon() {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+      <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clipRule="evenodd" />
+    </svg>
   )
 }
 
