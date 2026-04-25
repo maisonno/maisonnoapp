@@ -12,12 +12,6 @@ type Project = {
   featured: boolean
 }
 
-const STATUS = {
-  live:     { label: 'Live',     className: 'bg-emerald-950 text-emerald-400 border border-emerald-900' },
-  wip:      { label: 'En cours', className: 'bg-blue-950 text-blue-400 border border-blue-900' },
-  idea:     { label: 'Idée',     className: 'bg-slate-800 text-slate-400 border border-slate-700' },
-  archived: { label: 'Archivé',  className: 'bg-slate-800 text-slate-500 border border-slate-700' },
-} as const
 
 export default function ProjectCard({ project }: { project: Project }) {
   const href = project.url ?? `/projects/${project.slug}`
