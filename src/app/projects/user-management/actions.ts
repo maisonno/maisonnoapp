@@ -20,7 +20,7 @@ export async function createUser(data: { email: string } & ProfileData): Promise
     data.email,
     {
       data: { first_name: data.first_name, last_name: data.last_name },
-      redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/login`,
+      redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/auth/callback`,
     }
   )
 
@@ -61,7 +61,7 @@ export async function sendPasswordReset(email: string): Promise<ActionResult> {
   const supabase = await createClient()
 
   const { error } = await supabase.auth.resetPasswordForEmail(email, {
-    redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/login`,
+    redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/auth/callback`,
   })
 
   if (error) return { error: error.message }
