@@ -9,11 +9,26 @@ export default async function HomePage() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const { data: projects } = await supabase
+  // Récupère le profil du user courant pour filtrer les projets
+  const { data: profile } = await supabase
+    .from('usr_profiles')
+    .select('role, app_access')
+    .eq('id', user.id)
+    .single()
+
+  // Construit la requête projets
+  let projectsQuery = supabase
     .from('projects')
     .select('*')
     .order('sort_order', { ascending: true })
     .order('created_at', { ascending: false })
+
+  // Les non-admins voient uniquement leurs apps autorisées
+  if (profile && profile.role !== 'admin') {
+    projectsQuery = projectsQuery.in('slug', profile.app_access ?? [])
+  }
+
+  const { data: projects } = await projectsQuery
 
   return (
     <main className="min-h-screen bg-slate-950">
@@ -33,10 +48,9 @@ export default async function HomePage() {
           </div>
         ) : (
           <div className="text-center py-24">
-            <p className="text-slate-500 text-sm mb-2">Aucun projet pour l&apos;instant.</p>
+            <p className="text-slate-500 text-sm mb-2">Aucun projet disponible.</p>
             <p className="text-slate-600 text-xs">
-              Ajoute des entrées dans la table{' '}
-              <code className="text-slate-400 font-mono">projects</code> sur Supabase.
+              Contacte un administrateur pour obtenir des accès.
             </p>
           </div>
         )}

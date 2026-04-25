@@ -68,6 +68,7 @@ Cela évite les collisions et permet d'identifier l'origine d'une table au premi
 | habit-tracker | `hbt_` | `hbt_habits`, `hbt_entries` |
 | notes | `nts_` | `nts_notes`, `nts_folders` |
 | menu-management | `mnu_` | `mnu_dishes`, `mnu_menus`, `mnu_menu_items`, `mnu_generated_docs` |
+| user-management | `usr_` | `usr_profiles` |
 
 **Règle :** choisir un préfixe qui n'est pas encore utilisé. Le tenir à jour dans ce tableau.
 
