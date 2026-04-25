@@ -1,3 +1,5 @@
+import Link from 'next/link'
+
 type Project = {
   id: string
   title: string
@@ -19,70 +21,61 @@ const STATUS = {
 
 export default function ProjectCard({ project }: { project: Project }) {
   const status = STATUS[project.status as keyof typeof STATUS] ?? STATUS.idea
+  const href = project.url ?? `/projects/${project.slug}`
 
   return (
-    <article className="card p-6 flex flex-col gap-3">
-      {/* Status + actions */}
-      <div className="flex items-center justify-between">
-        <span className={`badge ${status.className}`}>
-          {project.status === 'live' && (
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-          )}
-          {status.label}
-        </span>
+    <Link href={href} className="block group">
+      <article className="card p-6 flex flex-col gap-3 h-full cursor-pointer group-hover:border-slate-600">
+        {/* Status + actions */}
+        <div className="flex items-center justify-between">
+          <span className={`badge ${status.className}`}>
+            {project.status === 'live' && (
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+            )}
+            {status.label}
+          </span>
 
-        <div className="flex items-center gap-3">
           {project.github_url && (
             <a
               href={project.github_url}
               target="_blank"
               rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
               className="text-slate-500 hover:text-slate-300 transition-colors"
               aria-label="GitHub"
             >
               <GitHubIcon />
             </a>
           )}
-          {project.url && (
-            <a
-              href={project.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-slate-500 hover:text-slate-300 transition-colors text-sm"
-              aria-label="Ouvrir"
-            >
-              ↗
-            </a>
-          )}
         </div>
-      </div>
 
-      {/* Title */}
-      <h2 className="text-white font-semibold text-base leading-snug">
-        {project.title}
-      </h2>
+        {/* Title */}
+        <h2 className="text-white font-semibold text-base leading-snug group-hover:text-blue-400 transition-colors">
+          {project.title}
+        </h2>
 
-      {/* Description */}
-      {project.description && (
-        <p className="text-slate-400 text-sm leading-relaxed flex-1">
-          {project.description}
-        </p>
-      )}
+        {/* Description */}
+        {project.description && (
+          <p className="text-slate-400 text-sm leading-relaxed flex-1">
+            {project.description}
+          </p>
+        )}
 
-      {/* Tags */}
-      {project.tags && project.tags.length > 0 && (
-        <div className="flex flex-wrap gap-1.5 pt-1">
-          {project.tags.map((tag) => (
-            <span
-              key={tag}
-              className="text-xs px-2 py-0.5 rounded-md bg-slate-800 text-slate-400 border border-slate-700"
-            >
-              {tag}
-            </span>
-          ))}
-        </div>
-      )}
-    </article>
+        {/* Tags */}
+        {project.tags && project.tags.length > 0 && (
+          <div className="flex flex-wrap gap-1.5 pt-1">
+            {project.tags.map((tag) => (
+              <span
+                key={tag}
+                className="text-xs px-2 py-0.5 rounded-md bg-slate-800 text-slate-400 border border-slate-700"
+              >
+                {tag}
+              </span>
+            ))}
+          </div>
+        )}
+      </article>
+    </Link>
   )
 }
 
