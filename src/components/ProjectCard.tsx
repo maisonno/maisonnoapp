@@ -20,7 +20,6 @@ const STATUS = {
 } as const
 
 export default function ProjectCard({ project }: { project: Project }) {
-  const status = STATUS[project.status as keyof typeof STATUS] ?? STATUS.idea
   const href = project.url ?? `/projects/${project.slug}`
 
   return (
