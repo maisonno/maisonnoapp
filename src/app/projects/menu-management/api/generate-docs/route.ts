@@ -2,7 +2,18 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import Docxtemplater from 'docxtemplater'
 import PizZip from 'pizzip'
+import { PDFDocument, degrees } from 'pdf-lib'
 import { CATEGORY_ORDER, CATEGORY_LABELS } from '../../lib/types'
+
+async function buildInversedPdf(pdfBuffer: Buffer): Promise<Buffer> {
+  const pdfDoc = await PDFDocument.load(pdfBuffer)
+  const pages = pdfDoc.getPages()
+  for (let i = 1; i < pages.length; i += 2) {
+    const page = pages[i]
+    page.setRotation(degrees(page.getRotation().angle + 180))
+  }
+  return Buffer.from(await pdfDoc.save())
+}
 
 type RequestBody = {
   menuId: string
@@ -185,6 +196,7 @@ export async function POST(request: Request) {
   const safeName = templateRecord.name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')
   const docxStoragePath = `${menuId}/${safeName}-${timestamp}.docx`
   const pdfStoragePath = `${menuId}/${safeName}-${timestamp}.pdf`
+  const pdfInversedStoragePath = `${menuId}/${safeName}-${timestamp}-inversed.pdf`
 
   const { error: docxUploadErr } = await supabase.storage
     .from('generated-docs')
@@ -199,6 +211,7 @@ export async function POST(request: Request) {
 
   // Convert to PDF via Gotenberg
   let pdfStoragePathFinal: string | null = null
+  let pdfInversedStoragePathFinal: string | null = null
   let pdfWarning: string | null = null
   const gotenbergUrl = process.env.GOTENBERG_URL
 
@@ -229,6 +242,24 @@ export async function POST(request: Request) {
         } else {
           pdfWarning = `Upload PDF : ${pdfUploadErr.message}`
         }
+
+        // Generate and upload inversed PDF if option is enabled
+        if (pdfStoragePathFinal && templateRecord.flip_even_pages) {
+          try {
+            const inversedBuffer = await buildInversedPdf(pdfBuffer)
+            const { error: inversedUploadErr } = await supabase.storage
+              .from('generated-docs')
+              .upload(pdfInversedStoragePath, inversedBuffer, {
+                contentType: 'application/pdf',
+                upsert: false,
+              })
+            if (!inversedUploadErr) {
+              pdfInversedStoragePathFinal = pdfInversedStoragePath
+            }
+          } catch {
+            // Non-blocking: inversed PDF failure doesn't fail the whole generation
+          }
+        }
       } else {
         const body = await gotenbergRes.text()
         pdfWarning = `Gotenberg ${gotenbergRes.status} : ${body.slice(0, 200)}`
@@ -251,6 +282,10 @@ export async function POST(request: Request) {
     ? (await supabase.storage.from('generated-docs').createSignedUrl(pdfStoragePathFinal, expiry)).data
     : null
 
+  const pdfInversedSignedUrl = pdfInversedStoragePathFinal
+    ? (await supabase.storage.from('generated-docs').createSignedUrl(pdfInversedStoragePathFinal, expiry)).data
+    : null
+
   // Record in DB — store template id as template_name for lookup
   const expiresAt = new Date(Date.now() + expiry * 1000).toISOString()
 
@@ -261,6 +296,7 @@ export async function POST(request: Request) {
       template_name: templateId,
       docx_path: docxUrl?.signedUrl ?? null,
       pdf_path: pdfSignedUrl?.signedUrl ?? null,
+      pdf_inversed_path: pdfInversedSignedUrl?.signedUrl ?? null,
       expires_at: expiresAt,
     })
     .select()

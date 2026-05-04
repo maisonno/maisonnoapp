@@ -15,6 +15,7 @@ const inputCls = 'w-full rounded-md border border-gray-300 bg-white px-3 py-2 te
 export default function TemplateEditModal({ template, onClose }: Props) {
   const [name, setName] = useState(template.name)
   const [description, setDescription] = useState(template.description ?? '')
+  const [flipEvenPages, setFlipEvenPages] = useState(template.flip_even_pages)
   const [file, setFile] = useState<File | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
@@ -54,6 +55,7 @@ export default function TemplateEditModal({ template, onClose }: Props) {
           template.id,
           name.trim(),
           description,
+          flipEvenPages,
           newStoragePath,
           newStoragePath ? (template.storage_path ?? undefined) : undefined,
         )
@@ -104,6 +106,19 @@ export default function TemplateEditModal({ template, onClose }: Props) {
               onChange={(e) => setDescription(e.target.value)}
               className={inputCls}
             />
+          </div>
+
+          <div className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              id="flip-even-pages"
+              checked={flipEvenPages}
+              onChange={(e) => setFlipEvenPages(e.target.checked)}
+              className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+            />
+            <label htmlFor="flip-even-pages" className="text-sm text-gray-700">
+              Retourner les pages paires (impression R/V paysage sur iOS)
+            </label>
           </div>
 
           <div>

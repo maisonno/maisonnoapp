@@ -69,6 +69,7 @@ export type GeneratedDoc = {
   template_name: string
   docx_path: string | null
   pdf_path: string | null
+  pdf_inversed_path: string | null
   expires_at: string
   created_at: string
 }
@@ -78,6 +79,7 @@ export type Template = {
   name: string
   storage_path: string | null
   description: string | null
+  flip_even_pages: boolean
   created_at: string
   updated_at: string
 }

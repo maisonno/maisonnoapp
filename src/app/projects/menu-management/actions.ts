@@ -357,13 +357,19 @@ export async function toggleFeatured(itemId: string, currentValue: boolean): Pro
 // TEMPLATES
 // ─────────────────────────────────────────────
 
-export async function createTemplate(name: string, storagePath: string, description: string): Promise<ActionState> {
+export async function createTemplate(
+  name: string,
+  storagePath: string,
+  description: string,
+  flipEvenPages: boolean,
+): Promise<ActionState> {
   const supabase = await createClient()
 
   const { error } = await supabase.from('mnu_templates').insert({
     name: name.trim(),
     storage_path: storagePath,
     description: description.trim() || null,
+    flip_even_pages: flipEvenPages,
   })
 
   if (error) return { error: error.message }
@@ -376,14 +382,16 @@ export async function updateTemplate(
   id: string,
   name: string,
   description: string,
+  flipEvenPages: boolean,
   newStoragePath?: string,
   oldStoragePath?: string,
 ): Promise<ActionState> {
   const supabase = await createClient()
 
-  const updateData: Record<string, string | null> = {
+  const updateData: Record<string, string | boolean | null> = {
     name: name.trim(),
     description: description.trim() || null,
+    flip_even_pages: flipEvenPages,
   }
   if (newStoragePath) updateData.storage_path = newStoragePath
 

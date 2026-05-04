@@ -104,6 +104,17 @@ export default function DocumentPanel({ menuId, docs, templates }: Props) {
                     PDF ↗
                   </a>
                 )}
+                {doc?.pdf_inversed_path && (
+                  <a
+                    href={doc.pdf_inversed_path}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="rounded-md bg-orange-50 px-2.5 py-1.5 text-xs font-medium text-orange-700 hover:bg-orange-100"
+                    title="Pages paires retournées à 180° — pour impression R/V paysage sur iOS"
+                  >
+                    PDF inversé ↗
+                  </a>
+                )}
                 {doc?.docx_path && (
                   <a
                     href={doc.docx_path}

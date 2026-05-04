@@ -13,6 +13,7 @@ const inputCls = 'w-full rounded-md border border-gray-300 bg-white px-3 py-2 te
 export default function TemplateFormModal({ onClose }: Props) {
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
+  const [flipEvenPages, setFlipEvenPages] = useState(false)
   const [file, setFile] = useState<File | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
@@ -46,7 +47,7 @@ export default function TemplateFormModal({ onClose }: Props) {
       }
 
       // 2. Save metadata via Server Action
-      const result = await createTemplate(name.trim(), storagePath, description)
+      const result = await createTemplate(name.trim(), storagePath, description, flipEvenPages)
       if (result?.error) {
         // Cleanup uploaded file on DB error
         await supabase.storage.from('templates').remove([storagePath])
@@ -92,6 +93,19 @@ export default function TemplateFormModal({ onClose }: Props) {
               placeholder="ex. Format A5, recto-verso"
               className={inputCls}
             />
+          </div>
+
+          <div className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              id="flip-even-pages"
+              checked={flipEvenPages}
+              onChange={(e) => setFlipEvenPages(e.target.checked)}
+              className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+            />
+            <label htmlFor="flip-even-pages" className="text-sm text-gray-700">
+              Retourner les pages paires (impression R/V paysage sur iOS)
+            </label>
           </div>
 
           <div>
