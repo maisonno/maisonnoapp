@@ -1,20 +1,21 @@
 'use client'
 
 import { useActionState, useEffect, useRef, useTransition, useState } from 'react'
-import { createDish, updateDish, archiveDish } from '../../actions'
+import { createDish, updateDish, archiveDish, createDishAndAddToMenu } from '../../actions'
 import type { ActionState, Dish, DishCategory } from '../../lib/types'
 import { CATEGORY_ORDER, CATEGORY_LABELS } from '../../lib/types'
 
 type Props = {
   onClose: () => void
   dish?: Dish
+  menuId?: string
 }
 
 const initialState: ActionState = null
 const inputCls = 'w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500'
 
-export default function DishFormModal({ onClose, dish }: Props) {
-  const action = dish ? updateDish : createDish
+export default function DishFormModal({ onClose, dish, menuId }: Props) {
+  const action = dish ? updateDish : menuId ? createDishAndAddToMenu : createDish
   const [state, formAction, isPending] = useActionState(action, initialState)
   const formRef = useRef<HTMLFormElement>(null)
   const [isArchiving, startArchiveTransition] = useTransition()
@@ -40,13 +41,14 @@ export default function DishFormModal({ onClose, dish }: Props) {
       <div className="w-full max-w-md rounded-lg bg-white shadow-xl">
         <div className="flex items-center justify-between border-b px-6 py-4">
           <h2 className="text-lg font-semibold text-gray-800">
-            {dish ? 'Modifier le plat' : 'Nouveau plat'}
+            {dish ? 'Modifier le plat' : menuId ? 'Créer et ajouter au menu' : 'Nouveau plat'}
           </h2>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">×</button>
         </div>
 
         <form ref={formRef} action={formAction} className="space-y-4 px-6 py-5">
           {dish && <input type="hidden" name="id" value={dish.id} />}
+          {menuId && <input type="hidden" name="menu_id" value={menuId} />}
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Nom *</label>

@@ -126,6 +126,53 @@ export async function importDishesFromCsv(
   return { success: msg }
 }
 
+export async function createDishAndAddToMenu(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const supabase = await createClient()
+
+  const menuId = formData.get('menu_id') as string
+  const name = formData.get('name') as string
+  const description = (formData.get('description') as string) || null
+  const priceRaw = formData.get('price') as string
+  const price = priceRaw ? parseFloat(priceRaw) : null
+  const category = formData.get('category') as DishCategory
+  const is_active = formData.get('is_active') !== 'false'
+
+  if (!name?.trim()) return { error: 'Le nom est obligatoire.' }
+  if (!menuId) return { error: 'Menu introuvable.' }
+
+  const { data: dish, error: createErr } = await supabase
+    .from('mnu_dishes')
+    .insert({ name: name.trim(), description: description?.trim() || null, price, category, is_active })
+    .select('id')
+    .single()
+
+  if (createErr || !dish) return { error: createErr?.message ?? 'Erreur de création.' }
+
+  const { data: existing } = await supabase
+    .from('mnu_menu_items')
+    .select('position, mnu_dishes!inner(category)')
+    .eq('menu_id', menuId)
+    .eq('mnu_dishes.category', category)
+    .order('position', { ascending: false })
+    .limit(1)
+
+  const nextPosition = existing && existing.length > 0 ? (existing[0].position as number) + 1 : 0
+
+  const { error: addErr } = await supabase.from('mnu_menu_items').insert({
+    menu_id: menuId,
+    dish_id: dish.id,
+    position: nextPosition,
+  })
+
+  if (addErr) return { error: addErr.message }
+
+  revalidatePath(REVALIDATE_PATH)
+  return { success: 'Plat créé et ajouté au menu.' }
+}
+
 // ─────────────────────────────────────────────
 // MENUS
 // ─────────────────────────────────────────────
