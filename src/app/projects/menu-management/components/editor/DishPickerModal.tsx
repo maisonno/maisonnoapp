@@ -4,6 +4,7 @@ import { useState, useTransition } from 'react'
 import { addDishToMenu } from '../../actions'
 import type { Dish, DishCategory } from '../../lib/types'
 import { CATEGORY_ORDER, CATEGORY_LABELS } from '../../lib/types'
+import DishFormModal from '../dishes/DishFormModal'
 
 type Props = {
   menuId: string
@@ -16,6 +17,7 @@ export default function DishPickerModal({ menuId, assignedDishIds, dishes, onClo
   const [isPending, startTransition] = useTransition()
   const [search, setSearch] = useState('')
   const [filterCategory, setFilterCategory] = useState<DishCategory | 'all'>('all')
+  const [showCreate, setShowCreate] = useState(false)
 
   const available = dishes.filter((d) => {
     if (assignedDishIds.has(d.id)) return false
@@ -106,15 +108,25 @@ export default function DishPickerModal({ menuId, assignedDishIds, dishes, onClo
           )}
         </div>
 
-        <div className="border-t px-6 py-3 shrink-0">
+        <div className="border-t px-6 py-3 shrink-0 flex gap-2">
+          <button
+            onClick={() => setShowCreate(true)}
+            className="rounded-md border border-blue-300 px-4 py-2 text-sm font-medium text-blue-700 hover:bg-blue-50"
+          >
+            + Créer un plat
+          </button>
           <button
             onClick={onClose}
-            className="w-full rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+            className="flex-1 rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
           >
             Fermer
           </button>
         </div>
       </div>
+
+      {showCreate && (
+        <DishFormModal menuId={menuId} onClose={() => setShowCreate(false)} />
+      )}
     </div>
   )
 }
