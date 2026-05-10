@@ -69,7 +69,8 @@ Cela évite les collisions et permet d'identifier l'origine d'une table au premi
 | notes | `nts_` | `nts_notes`, `nts_folders` |
 | menu-management | `mnu_` | `mnu_dishes`, `mnu_menus`, `mnu_menu_items`, `mnu_generated_docs` |
 | user-management | `usr_` | `usr_profiles` |
-| scoubidoo | `scd_` | _(à définir)_ |
+| scoubidoo-caisse | `scd_` | `scd_caisse`, `scd_tag`, `scd_jours_ouverts` |
+| scoubidoo-poire | `scd_` | `scd_compta_poire`, `scd_type_operation` |
 
 **Règle :** choisir un préfixe qui n'est pas encore utilisé. Le tenir à jour dans ce tableau.
 
