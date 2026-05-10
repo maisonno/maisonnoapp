@@ -6,6 +6,7 @@ import type { CaisseFields, Tag, VeilleData, Caisse } from '../../lib/types'
 import { computeAll } from '../../lib/formulas'
 import { upsertCaisse, fermerCaisse } from '../../actions'
 import StepEspeces from './StepEspeces'
+import StepRapportX1 from './StepRapportX1'
 import StepPayPlus from './StepPayPlus'
 import StepSmileAndPay from './StepSmileAndPay'
 import StepReglement from './StepReglement'
@@ -14,11 +15,12 @@ import StepVerification from './StepVerification'
 
 const STEPS = [
   { id: 1, label: 'Espèces' },
-  { id: 2, label: 'Pay+' },
-  { id: 3, label: 'S&P' },
-  { id: 4, label: 'Rapport X' },
-  { id: 5, label: 'Répartition' },
-  { id: 6, label: 'Vérification' },
+  { id: 2, label: 'Rapport X 1' },
+  { id: 3, label: 'Pay+' },
+  { id: 4, label: 'S&P' },
+  { id: 5, label: 'Rapport X 2' },
+  { id: 6, label: 'Répartition' },
+  { id: 7, label: 'Vérification' },
 ]
 
 const DRAFT_KEY = 'scoubidoo-caisse-draft'
@@ -113,7 +115,7 @@ export default function CaisseFormClient({ tags, veille, defaultDate, caisseId, 
 
   const goNext = async () => {
     const ok = await saveProgress()
-    if (ok) setStep((s) => Math.min(s + 1, 6))
+    if (ok) setStep((s) => Math.min(s + 1, 7))
   }
 
   const goPrev = () => setStep((s) => Math.max(s - 1, 1))
@@ -185,11 +187,12 @@ export default function CaisseFormClient({ tags, veille, defaultDate, caisseId, 
       {/* Contenu de l'étape */}
       <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5">
         {step === 1 && <StepEspeces {...stepProps} />}
-        {step === 2 && <StepPayPlus {...stepProps} />}
-        {step === 3 && <StepSmileAndPay {...stepProps} />}
-        {step === 4 && <StepReglement {...stepProps} />}
-        {step === 5 && <StepRepartition {...stepProps} />}
-        {step === 6 && <StepVerification {...stepProps} />}
+        {step === 2 && <StepRapportX1 {...stepProps} />}
+        {step === 3 && <StepPayPlus {...stepProps} />}
+        {step === 4 && <StepSmileAndPay {...stepProps} />}
+        {step === 5 && <StepReglement {...stepProps} />}
+        {step === 6 && <StepRepartition {...stepProps} />}
+        {step === 7 && <StepVerification {...stepProps} />}
       </div>
 
       {error && (
@@ -205,7 +208,7 @@ export default function CaisseFormClient({ tags, veille, defaultDate, caisseId, 
             ← Précédent
           </button>
         )}
-        {step < 6 ? (
+        {step < 7 ? (
           <button
             onClick={goNext}
             disabled={saving}
@@ -219,8 +222,8 @@ export default function CaisseFormClient({ tags, veille, defaultDate, caisseId, 
             disabled={saving}
             className={`flex-1 py-3 rounded-xl font-semibold transition-colors disabled:opacity-50 ${
               Math.abs(calc.delta) < 0.01
-                ? 'bg-emerald-600 hover:bg-emerald-700'
-                : 'bg-amber-600 hover:bg-amber-700'
+                  ? 'bg-emerald-600 hover:bg-emerald-700'
+                  : 'bg-amber-600 hover:bg-amber-700'
             }`}
           >
             {saving ? 'Sauvegarde…' : '🔒 Fermer la caisse'}

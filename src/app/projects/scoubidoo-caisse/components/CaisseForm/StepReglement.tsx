@@ -41,7 +41,10 @@ export default function StepReglement({ form, setNum, calc }: Props) {
 
   return (
     <div className="space-y-5">
-      <h2 className="text-lg font-semibold">Rapport X — L&apos;Addition</h2>
+      <h2 className="text-lg font-semibold">Rapport X — 2ème lecture</h2>
+      <p className="text-xs text-slate-400">
+        Valeurs lues après saisie des ajustements dans L&apos;Addition.
+      </p>
 
       <NumField label="Fond de caisse matin"
         value={form.fond_caisse_matin} onChange={(v) => setNum('fond_caisse_matin', v)}
@@ -52,15 +55,12 @@ export default function StepReglement({ form, setNum, calc }: Props) {
 
       <NumField label="Règlement total"
         value={form.reglement_service_total} onChange={(v) => setNum('reglement_service_total', v)}
-        hint="Montant total du rapport X" />
+        hint="Montant total du rapport X final" />
 
       <section className="space-y-4 pt-3 border-t border-slate-700">
         <h3 className="text-sm font-medium text-slate-400 uppercase tracking-wide">Ventilations</h3>
 
-        <NumField label="Cash"
-          value={form.reglement_service_cash} onChange={(v) => setNum('reglement_service_cash', v)} />
-
-        <NumField label="CB v2"
+        <NumField label="CB v2 (après ajustements)"
           value={form.reglement_service_cb_v2} onChange={(v) => setNum('reglement_service_cb_v2', v)} />
 
         <NumField label="Pay+"
@@ -77,10 +77,20 @@ export default function StepReglement({ form, setNum, calc }: Props) {
 
         <NumField label="Autres / Chèque"
           value={form.reglement_autres_cheque} onChange={(v) => setNum('reglement_autres_cheque', v)} />
+
+        {/* Cash — rappel de la valeur saisie en étape 2, non modifiable ici */}
+        <div className="flex justify-between items-center py-1">
+          <span className="text-sm text-slate-400">Cash (saisi étape 2)</span>
+          <span className="text-sm font-mono text-slate-300">
+            {form.reglement_service_cash != null
+              ? Number(form.reglement_service_cash).toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })
+              : '—'}
+          </span>
+        </div>
       </section>
 
       {/* Contrôle */}
-      <div className={`pt-4 border-t border-slate-700 rounded-xl p-4 ${verifierOk ? 'bg-emerald-950/40 border-emerald-800' : 'bg-red-950/40 border-red-800'} border`}>
+      <div className={`rounded-xl p-4 border ${verifierOk ? 'bg-emerald-950/40 border-emerald-800' : 'bg-red-950/40 border-red-800'}`}>
         <div className="flex justify-between items-center">
           <span className="text-sm font-medium">Règlement vérifier</span>
           <span className={`text-xl font-bold ${verifierOk ? 'text-emerald-400' : 'text-red-400'}`}>
