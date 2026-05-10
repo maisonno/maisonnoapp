@@ -61,16 +61,11 @@ export default function CaisseFormClient({ tags, veille, defaultDate, caisseId, 
   const [currentId, setCurrentId] = useState<string | null>(caisseId)
 
   const [form, setForm] = useState<CaisseFields & { date: string; tag_id: string; notes: string }>(() => {
-    // Si édition, pas de draft
     if (initialData) return buildInitial(initialData, null, defaultDate)
-    // Sinon vérifier draft
     if (typeof window !== 'undefined') {
       try {
         const saved = localStorage.getItem(DRAFT_KEY)
-        if (saved) {
-          const draft = JSON.parse(saved)
-          return draft
-        }
+        if (saved) return JSON.parse(saved)
       } catch {}
     }
     return buildInitial(null, veille, defaultDate)
@@ -78,7 +73,6 @@ export default function CaisseFormClient({ tags, veille, defaultDate, caisseId, 
 
   const calc = computeAll(form)
 
-  // Sauvegarde locale toutes les 10s (uniquement pour nouveau service)
   useEffect(() => {
     if (initialData) return
     const timer = setInterval(() => {
@@ -100,7 +94,6 @@ export default function CaisseFormClient({ tags, veille, defaultDate, caisseId, 
     setForm((prev) => ({ ...prev, [field]: Math.max(0, value) }))
   }, [])
 
-  // Sauvegarde auto à chaque changement d'étape
   const saveProgress = useCallback(async () => {
     if (!form.date) return
     setSaving(true)
@@ -145,27 +138,8 @@ export default function CaisseFormClient({ tags, veille, defaultDate, caisseId, 
   const stepProps = { form, set, setNum, setInt, calc }
 
   return (
-    <div className="space-y-6">
-      {/* Stepper nav */}
-      <div className="flex gap-1 overflow-x-auto pb-1">
-        {STEPS.map((s) => (
-          <button
-            key={s.id}
-            onClick={() => setStep(s.id)}
-            className={`shrink-0 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-              step === s.id
-                ? 'bg-blue-600 text-white'
-                : step > s.id
-                ? 'bg-emerald-900/40 text-emerald-400'
-                : 'bg-slate-800 text-slate-400'
-            }`}
-          >
-            {s.id}. {s.label}
-          </button>
-        ))}
-      </div>
-
-      {/* Champs communs */}
+    <div className="space-y-4">
+      {/* Date + Tag — toujours visibles */}
       <div className="flex gap-3">
         <div className="flex-1">
           <label className="text-xs text-slate-400 block mb-1">Date</label>
@@ -189,7 +163,26 @@ export default function CaisseFormClient({ tags, veille, defaultDate, caisseId, 
         </div>
       </div>
 
-      {/* Étape active */}
+      {/* Onglets */}
+      <div className="flex overflow-x-auto border-b border-slate-700 -mb-px">
+        {STEPS.map((s) => (
+          <button
+            key={s.id}
+            onClick={() => setStep(s.id)}
+            className={`shrink-0 px-3 py-2.5 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
+              step === s.id
+                ? 'border-blue-500 text-blue-400'
+                : step > s.id
+                ? 'border-emerald-700 text-emerald-500'
+                : 'border-transparent text-slate-500 hover:text-slate-300'
+            }`}
+          >
+            {s.id}. {s.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Contenu de l'étape */}
       <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5">
         {step === 1 && <StepEspeces {...stepProps} />}
         {step === 2 && <StepPayPlus {...stepProps} />}
@@ -199,7 +192,6 @@ export default function CaisseFormClient({ tags, veille, defaultDate, caisseId, 
         {step === 6 && <StepVerification {...stepProps} />}
       </div>
 
-      {/* Erreur */}
       {error && (
         <p className="text-sm text-red-400 bg-red-950/40 border border-red-800 rounded-lg px-4 py-2">
           {error}

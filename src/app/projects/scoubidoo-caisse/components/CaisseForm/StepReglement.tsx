@@ -43,6 +43,10 @@ export default function StepReglement({ form, setNum, calc }: Props) {
     <div className="space-y-5">
       <h2 className="text-lg font-semibold">Rapport X — L&apos;Addition</h2>
 
+      <NumField label="Fond de caisse matin"
+        value={form.fond_caisse_matin} onChange={(v) => setNum('fond_caisse_matin', v)}
+        hint="Montant en caisse au début du service" />
+
       <NumField label="Total service HT"
         value={form.total_service_ht} onChange={(v) => setNum('total_service_ht', v)} />
 
