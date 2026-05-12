@@ -5,22 +5,26 @@ import { useRouter } from 'next/navigation'
 import type { CaisseFields, Tag, VeilleData, Caisse } from '../../lib/types'
 import { computeAll } from '../../lib/formulas'
 import { upsertCaisse, fermerCaisse } from '../../actions'
-import StepEspeces from './StepEspeces'
+import StepService from './StepService'
 import StepRapportX1 from './StepRapportX1'
-import StepPayPlus from './StepPayPlus'
-import StepSmileAndPay from './StepSmileAndPay'
+import StepCB from './StepCB'
+import StepEspeces from './StepEspeces'
+import StepAjustementCB from './StepAjustementCB'
+import StepAjustementCash from './StepAjustementCash'
 import StepReglement from './StepReglement'
 import StepRepartition from './StepRepartition'
-import StepVerification from './StepVerification'
+import StepCloture from './StepCloture'
 
 const STEPS = [
-  { id: 1, label: 'Espèces' },
-  { id: 2, label: 'Rapport X 1' },
-  { id: 3, label: 'Pay+' },
-  { id: 4, label: 'S&P' },
-  { id: 5, label: 'Rapport X 2' },
-  { id: 6, label: 'Répartition' },
-  { id: 7, label: 'Vérification' },
+  { id: 0, label: 'Service' },
+  { id: 1, label: 'Rapport X' },
+  { id: 2, label: 'CB' },
+  { id: 3, label: 'Espèces' },
+  { id: 4, label: 'Ajust. CB' },
+  { id: 5, label: 'Ajust. Cash' },
+  { id: 6, label: 'Rapport X2' },
+  { id: 7, label: 'Répartition' },
+  { id: 8, label: 'Clôture' },
 ]
 
 const DRAFT_KEY = 'scoubidoo-caisse-draft'
@@ -52,12 +56,14 @@ function buildInitial(initialData: Caisse | null, veille: VeilleData | null, def
     sp_cb_jplus1_veille_pourboire_incl: veille?.sp_cb_jplus1_pourboire_incl ?? null,
     sp_pourboire_jplus1_de_la_veille: veille?.sp_pourboire_jplus1 ?? null,
     payplus_jplus1_de_la_veille: veille?.payplus_jplus1 ?? null,
+    autre_cb_jplus1_veille_pourboire_incl: veille?.autre_cb_jplus1_pourboire_incl ?? null,
+    autre_pourboire_jplus1_de_la_veille: veille?.autre_pourboire_jplus1 ?? null,
   }
 }
 
 export default function CaisseFormClient({ tags, veille, defaultDate, caisseId, initialData }: Props) {
   const router = useRouter()
-  const [step, setStep] = useState(1)
+  const [step, setStep] = useState(0)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [currentId, setCurrentId] = useState<string | null>(caisseId)
@@ -97,7 +103,7 @@ export default function CaisseFormClient({ tags, veille, defaultDate, caisseId, 
   }, [])
 
   const saveProgress = useCallback(async () => {
-    if (!form.date) return
+    if (!form.date) return false
     setSaving(true)
     setError(null)
     const result = await upsertCaisse(currentId, form as Record<string, unknown>)
@@ -115,17 +121,17 @@ export default function CaisseFormClient({ tags, veille, defaultDate, caisseId, 
 
   const goNext = async () => {
     const ok = await saveProgress()
-    if (ok) setStep((s) => Math.min(s + 1, 7))
+    if (ok) setStep((s) => Math.min(s + 1, 8))
   }
 
-  const goPrev = () => setStep((s) => Math.max(s - 1, 1))
+  const goPrev = () => setStep((s) => Math.max(s - 1, 0))
 
   const handleFermer = async () => {
     const ok = await saveProgress()
     if (!ok || !currentId) return
     const confirm = window.confirm(
-      Math.abs(calc.delta) >= 0.01
-        ? `⚠️ Le delta est de ${calc.delta.toFixed(2)} €. Fermer quand même ?`
+      Math.abs(calc.delta_cloture) >= 0.01
+        ? `⚠️ Le delta de clôture est de ${calc.delta_cloture.toFixed(2)} €. Fermer quand même ?`
         : 'Fermer la caisse ?'
     )
     if (!confirm) return
@@ -141,30 +147,6 @@ export default function CaisseFormClient({ tags, veille, defaultDate, caisseId, 
 
   return (
     <div className="space-y-4">
-      {/* Date + Tag — toujours visibles */}
-      <div className="flex gap-3">
-        <div className="flex-1">
-          <label className="text-xs text-slate-400 block mb-1">Date</label>
-          <input
-            type="date"
-            value={form.date}
-            onChange={(e) => set('date', e.target.value)}
-            className="input"
-          />
-        </div>
-        <div className="flex-1">
-          <label className="text-xs text-slate-400 block mb-1">Tag</label>
-          <select
-            value={form.tag_id}
-            onChange={(e) => set('tag_id', e.target.value)}
-            className="input"
-          >
-            <option value="">—</option>
-            {tags.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-          </select>
-        </div>
-      </div>
-
       {/* Onglets */}
       <div className="flex overflow-x-auto border-b border-slate-700 -mb-px">
         {STEPS.map((s) => (
@@ -186,13 +168,15 @@ export default function CaisseFormClient({ tags, veille, defaultDate, caisseId, 
 
       {/* Contenu de l'étape */}
       <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5">
-        {step === 1 && <StepEspeces {...stepProps} />}
-        {step === 2 && <StepRapportX1 {...stepProps} />}
-        {step === 3 && <StepPayPlus {...stepProps} />}
-        {step === 4 && <StepSmileAndPay {...stepProps} />}
-        {step === 5 && <StepReglement {...stepProps} />}
-        {step === 6 && <StepRepartition {...stepProps} />}
-        {step === 7 && <StepVerification {...stepProps} />}
+        {step === 0 && <StepService form={form} set={set} tags={tags} />}
+        {step === 1 && <StepRapportX1 {...stepProps} />}
+        {step === 2 && <StepCB {...stepProps} />}
+        {step === 3 && <StepEspeces {...stepProps} />}
+        {step === 4 && <StepAjustementCB {...stepProps} />}
+        {step === 5 && <StepAjustementCash {...stepProps} />}
+        {step === 6 && <StepReglement {...stepProps} />}
+        {step === 7 && <StepRepartition {...stepProps} />}
+        {step === 8 && <StepCloture {...stepProps} />}
       </div>
 
       {error && (
@@ -203,12 +187,12 @@ export default function CaisseFormClient({ tags, veille, defaultDate, caisseId, 
 
       {/* Navigation */}
       <div className="flex gap-3">
-        {step > 1 && (
+        {step > 0 && (
           <button onClick={goPrev} className="flex-1 py-3 rounded-xl border border-slate-700 text-slate-300 hover:border-slate-600 transition-colors">
             ← Précédent
           </button>
         )}
-        {step < 7 ? (
+        {step < 8 ? (
           <button
             onClick={goNext}
             disabled={saving}
@@ -221,12 +205,12 @@ export default function CaisseFormClient({ tags, veille, defaultDate, caisseId, 
             onClick={handleFermer}
             disabled={saving}
             className={`flex-1 py-3 rounded-xl font-semibold transition-colors disabled:opacity-50 ${
-              Math.abs(calc.delta) < 0.01
+              Math.abs(calc.delta_cloture) < 0.01
                   ? 'bg-emerald-600 hover:bg-emerald-700'
                   : 'bg-amber-600 hover:bg-amber-700'
             }`}
           >
-            {saving ? 'Sauvegarde…' : '🔒 Fermer la caisse'}
+            {saving ? 'Sauvegarde…' : 'Fermer la caisse'}
           </button>
         )}
       </div>

@@ -29,18 +29,22 @@ export type CaisseFields = {
   poire?: number | null
   ajout_monnaie?: number | null
   mouvement_monnaie?: number | null
-  // E. L'Addition
+  // E. Règlements L'Addition
   total_service_ht?: number | null
+  total_service_ttc?: number | null
   reglement_cb_du_service_v1?: number | null
   reglement_service_total?: number | null
   reglement_service_cash?: number | null
+  reglement_service_cash_v2?: number | null
   reglement_service_cb_v2?: number | null
   reglement_service_payplus?: number | null
   reglement_service_compte_client?: number | null
   reglement_service_trop_percu_cb?: number | null
   reglement_service_pay_at_table?: number | null
   reglement_autres_cheque?: number | null
-  // F. Pay+
+  reglement_differe_cb?: number | null
+  reglement_differe_cash?: number | null
+  // F. Pay+ (conservé pour historique)
   payplus_rapport_x?: number | null
   payplus_ventes_service?: number | null
   payplus_jplus1?: number | null
@@ -54,14 +58,21 @@ export type CaisseFields = {
   sp_pourboire_j?: number | null
   sp_pourboire_jplus1?: number | null
   sp_pourboire_jplus1_de_la_veille?: number | null
+  // G2. Autre service CB
+  autre_cb_j_pourboire_incl?: number | null
+  autre_cb_jplus1_pourboire_incl?: number | null
+  autre_cb_jplus1_veille_pourboire_incl?: number | null
+  autre_pourboire_j?: number | null
+  autre_pourboire_jplus1?: number | null
+  autre_pourboire_jplus1_de_la_veille?: number | null
   // H. Pourboires versés
   pourboire_tpe_verse_au_pourboire?: number | null
   trop_percu_verse_au_pourboire?: number | null
-  // I. Comptes clients
-  paiement_compte_cb?: number | null
-  paiement_compte_cash?: number | null
+  // I. Ajustements
   ecart_cb?: number | null
   ecart_cash?: number | null
+  paiement_compte_cb?: number | null
+  paiement_compte_cash?: number | null
 }
 
 export type Caisse = CaisseFields & {
@@ -79,35 +90,10 @@ export type Caisse = CaisseFields & {
 
 export type CaisseWithCalc = Caisse & {
   tag_name: string | null
-  // Calculés
   total_caisse_soir: number
-  nb_pieces_2_poids: number
-  nb_pieces_1_poids: number
-  nb_pieces_50c_poids: number
-  nb_pieces_20c_poids: number
-  nb_pieces_10c_poids: number
-  payplus_encaissements: number
-  payplus_pourboire: number
-  sp_pourboire_service: number
-  sp_cb_service: number
-  trop_percu: number
-  total_encaissements_ls: number
-  mois_label: string
-  pourboire_tpe: number
-  total_encaissements_cash_reel: number
-  total_ca_cash: number
-  total_encaissements_cb_reel: number
-  total_encaissements_cb_ls: number
   full_ca: number
-  ht_plus_poire: number
   delta: number
-  delta_encaissement_cash: number
-  delta_encaissement_cb: number
-  reglement_verifier: number
-  ecart_cash_service: number
-  cb_ecart_service: number
-  a_mettre_au_frais: number
-  delta_a_ajouter_cb: number
+  mois_label: string
 }
 
 export type Tag = {
@@ -115,17 +101,10 @@ export type Tag = {
   name: string
 }
 
-export type JoursOuverts = {
-  id: string
-  mois: number
-  nb_jours_ouverts: number
-  objectif_par_jour: number
-  objectif_min: number
-}
-
-// Valeurs J-1 à pré-remplir dans le formulaire "Nouveau service"
 export type VeilleData = {
   sp_cb_jplus1_pourboire_incl: number | null
   sp_pourboire_jplus1: number | null
   payplus_jplus1: number | null
+  autre_cb_jplus1_pourboire_incl: number | null
+  autre_pourboire_jplus1: number | null
 }
