@@ -33,6 +33,18 @@ const PIECES: {
   { qtyField: 'pieces_10c', poidsField: 'poids_pieces_10c', nbField: 'nb_pieces_10c', label: '10 c' },
 ]
 
+function StepBtn({ onClick, children }: { onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="w-10 h-10 rounded-xl bg-slate-700 hover:bg-slate-600 active:bg-slate-500 text-lg font-bold transition-colors shrink-0 flex items-center justify-center"
+    >
+      {children}
+    </button>
+  )
+}
+
 export default function StepEspeces({ form, setInt, setNum, calc }: Props) {
   return (
     <div className="space-y-6">
@@ -46,13 +58,7 @@ export default function StepEspeces({ form, setInt, setNum, calc }: Props) {
           return (
             <div key={field} className="flex items-center gap-2">
               <span className="w-14 text-sm text-slate-300 font-medium shrink-0">{label}</span>
-              <button
-                type="button"
-                onClick={() => setInt(field, val - 1)}
-                className="w-11 h-11 rounded-xl bg-slate-700 hover:bg-slate-600 text-xl font-bold transition-colors shrink-0"
-              >
-                −
-              </button>
+              <StepBtn onClick={() => setInt(field, val - 1)}>−</StepBtn>
               <input
                 type="number"
                 inputMode="numeric"
@@ -62,58 +68,66 @@ export default function StepEspeces({ form, setInt, setNum, calc }: Props) {
                 placeholder="0"
                 className="w-16 bg-slate-800 border border-slate-600 rounded-lg px-2 py-2 text-center text-lg font-mono font-semibold focus:outline-none focus:border-blue-500"
               />
-              <button
-                type="button"
-                onClick={() => setInt(field, val + 1)}
-                className="w-11 h-11 rounded-xl bg-slate-700 hover:bg-slate-600 text-xl font-bold transition-colors shrink-0"
-              >
-                +
-              </button>
+              <StepBtn onClick={() => setInt(field, val + 1)}>+</StepBtn>
             </div>
           )
         })}
       </section>
 
-      {/* Pièces : qty + poids sur la même ligne */}
-      <section className="space-y-2">
-        <div className="flex items-center gap-2 pb-1">
-          <h3 className="text-sm font-medium text-slate-400 uppercase tracking-wide flex-1">Pièces</h3>
-          <span className="text-xs text-slate-500 w-20 text-center">Qté</span>
-          <span className="text-xs text-slate-500 w-20 text-center">Poids (g)</span>
-          <span className="text-xs text-slate-500 w-14 text-right">≈ pcs</span>
+      {/* Pièces : qty + poids sur la même ligne, alignés en grid */}
+      <section>
+        {/* Header */}
+        <div className="grid grid-cols-[3.5rem_1fr_4.5rem_3rem] gap-x-2 mb-2">
+          <h3 className="text-sm font-medium text-slate-400 uppercase tracking-wide">Pièces</h3>
+          <span className="text-xs text-slate-500 text-center self-end pb-0.5">Qté</span>
+          <span className="text-xs text-slate-500 text-center self-end pb-0.5">Poids (g)</span>
+          <span className="text-xs text-slate-500 text-right self-end pb-0.5">≈ pcs</span>
         </div>
-        {PIECES.map(({ qtyField, poidsField, nbField, label }) => {
-          const qty = (form[qtyField] as number) ?? 0
-          const poids = (form[poidsField] as number | null) ?? null
-          const nb = (calc[nbField as keyof typeof calc] as number)
-          return (
-            <div key={qtyField} className="flex items-center gap-2">
-              <span className="w-14 text-sm text-slate-300 font-medium shrink-0">{label}</span>
-              <input
-                type="number"
-                inputMode="numeric"
-                min="0"
-                value={qty === 0 ? '' : qty}
-                onChange={(e) => setInt(qtyField, parseInt(e.target.value) || 0)}
-                placeholder="0"
-                className="w-20 bg-slate-800 border border-slate-600 rounded-lg px-2 py-2 text-center text-sm font-mono focus:outline-none focus:border-blue-500"
-              />
-              <input
-                type="number"
-                inputMode="decimal"
-                min="0"
-                step="0.1"
-                value={poids ?? ''}
-                onChange={(e) => setNum(poidsField, e.target.value)}
-                placeholder="—"
-                className="w-20 bg-slate-800 border border-slate-600 rounded-lg px-2 py-2 text-center text-sm font-mono focus:outline-none focus:border-blue-500"
-              />
-              <span className="w-14 text-xs text-slate-400 text-right font-mono">
-                {nb > 0 ? `≈ ${nb.toFixed(1)}` : '—'}
-              </span>
-            </div>
-          )
-        })}
+
+        <div className="space-y-2">
+          {PIECES.map(({ qtyField, poidsField, nbField, label }) => {
+            const qty = (form[qtyField] as number) ?? 0
+            const poids = (form[poidsField] as number | null) ?? null
+            const nb = calc[nbField as keyof typeof calc] as number
+            return (
+              <div key={qtyField} className="grid grid-cols-[3.5rem_1fr_4.5rem_3rem] gap-x-2 items-center">
+                <span className="text-sm text-slate-300 font-medium">{label}</span>
+
+                {/* +/- qty */}
+                <div className="flex items-center gap-1">
+                  <StepBtn onClick={() => setInt(qtyField, qty - 1)}>−</StepBtn>
+                  <input
+                    type="number"
+                    inputMode="numeric"
+                    min="0"
+                    value={qty === 0 ? '' : qty}
+                    onChange={(e) => setInt(qtyField, parseInt(e.target.value) || 0)}
+                    placeholder="0"
+                    className="flex-1 min-w-0 bg-slate-800 border border-slate-600 rounded-lg px-1 py-2 text-center text-sm font-mono font-semibold focus:outline-none focus:border-blue-500"
+                  />
+                  <StepBtn onClick={() => setInt(qtyField, qty + 1)}>+</StepBtn>
+                </div>
+
+                {/* Poids */}
+                <input
+                  type="number"
+                  inputMode="decimal"
+                  min="0"
+                  step="0.1"
+                  value={poids ?? ''}
+                  onChange={(e) => setNum(poidsField, e.target.value)}
+                  placeholder="—"
+                  className="w-full bg-slate-800 border border-slate-600 rounded-lg px-2 py-2 text-center text-sm font-mono focus:outline-none focus:border-blue-500"
+                />
+
+                {/* ≈ pcs */}
+                <span className="text-xs text-slate-400 text-right font-mono">
+                  {nb > 0 ? `≈${nb.toFixed(0)}` : '—'}
+                </span>
+              </div>
+            )
+          })}
+        </div>
       </section>
 
       {/* Total */}
