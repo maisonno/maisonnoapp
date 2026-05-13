@@ -91,10 +91,28 @@ export async function deleteCaisse(id: string): Promise<ActionState> {
 }
 
 type SPTransaction = {
-  transactionDate: string   // "YYYYMMDD"
+  transactionDate: string   // "YYYYMMDD" ou "DD/MM/YYYY" selon l'API
   amount: number
   tipsAmount: number
-  transactionResponseStatus: boolean
+  transactionResponseStatus?: boolean | null
+  stateId?: number
+}
+
+function matchesDate(txDate: string, serviceDate: string): boolean {
+  // Accepte "20260512" (YYYYMMDD) et "12/05/2026" (DD/MM/YYYY)
+  const compact = serviceDate.replace(/-/g, '')            // "20260512"
+  const [y, m, d] = serviceDate.split('-')
+  const fr = `${d}/${m}/${y}`                              // "12/05/2026"
+  return txDate === compact || txDate === fr
+}
+
+function matchesNextDay(txDate: string, serviceDate: string): boolean {
+  const next = nextDayYYYYMMDD(serviceDate)               // "20260513"
+  const d = new Date(serviceDate + 'T12:00:00Z')
+  d.setUTCDate(d.getUTCDate() + 1)
+  const [ny, nm, nd2] = d.toISOString().slice(0, 10).split('-')
+  const nextFr = `${nd2}/${nm}/${ny}`                      // "13/05/2026"
+  return txDate === next || txDate === nextFr
 }
 
 type SPImportResult = {
@@ -150,12 +168,10 @@ export async function importSmileAndPay(serviceDate: string): Promise<SPImportRe
     return { error: 'Erreur lors de la récupération des transactions.' }
   }
 
-  const accepted = transactions.filter((tx) => tx.transactionResponseStatus === true)
-  const jDate = serviceDate.replace(/-/g, '')
-  const jPlus1Date = nextDayYYYYMMDD(serviceDate)
-
-  const jTx = accepted.filter((tx) => tx.transactionDate === jDate)
-  const jPlus1Tx = accepted.filter((tx) => tx.transactionDate === jPlus1Date)
+  // Pas de filtre sur transactionResponseStatus — peut être absent/null dans la vraie API
+  // On inclut toutes les transactions (les remboursements ont des montants négatifs)
+  const jTx = transactions.filter((tx) => matchesDate(tx.transactionDate, serviceDate))
+  const jPlus1Tx = transactions.filter((tx) => matchesNextDay(tx.transactionDate, serviceDate))
 
   return {
     sp_cb_j_pourboire_incl: sumField(jTx, 'amount'),
