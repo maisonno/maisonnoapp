@@ -14,6 +14,7 @@ export async function upsertCaisse(
 
   const payload = {
     ...data,
+    tag_id: data.tag_id === '' ? null : data.tag_id,
     updated_by: user.id,
     ...(id ? {} : { created_by: user.id }),
   }
