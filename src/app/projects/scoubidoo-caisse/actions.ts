@@ -4,6 +4,30 @@ import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import type { ActionState } from './lib/types'
 
+// Colonnes valides de scd_caisse — filtre les champs fantômes de localStorage
+const VALID_CAISSE_COLUMNS = new Set([
+  'date', 'notes', 'tag_id', 'ne_pas_compter',
+  'billets_500', 'billets_200', 'billets_100', 'billets_50', 'billets_20', 'billets_10', 'billets_5',
+  'pieces_2', 'pieces_1', 'pieces_50c', 'pieces_20c', 'pieces_10c',
+  'poids_pieces_2', 'poids_pieces_1', 'poids_pieces_50c', 'poids_pieces_20c', 'poids_pieces_10c',
+  'fond_caisse_matin', 'fond_caisse_soir', 'mis_au_coffre', 'poire', 'ajout_monnaie', 'mouvement_monnaie',
+  'total_service_ht', 'total_service_ttc',
+  'reglement_cb_du_service_v1', 'reglement_service_total', 'reglement_service_cash',
+  'reglement_service_cash_v2', 'reglement_service_cb_v2', 'reglement_service_payplus',
+  'reglement_service_compte_client', 'reglement_service_trop_percu_cb',
+  'reglement_service_pay_at_table', 'reglement_autres_cheque',
+  'reglement_differe_cb', 'reglement_differe_cash',
+  'payplus_rapport_x', 'payplus_ventes_service', 'payplus_jplus1', 'payplus_jplus1_de_la_veille',
+  'payplus_cumul_pourboire', 'payplus_pourboire_service',
+  'sp_cb_j_pourboire_incl', 'sp_cb_jplus1_pourboire_incl', 'sp_cb_jplus1_veille_pourboire_incl',
+  'sp_pourboire_j', 'sp_pourboire_jplus1', 'sp_pourboire_jplus1_de_la_veille',
+  'autre_cb_j_pourboire_incl', 'autre_cb_jplus1_pourboire_incl', 'autre_cb_jplus1_veille_pourboire_incl',
+  'autre_pourboire_j', 'autre_pourboire_jplus1', 'autre_pourboire_jplus1_de_la_veille',
+  'pourboire_tpe_verse_au_pourboire', 'trop_percu_verse_au_pourboire',
+  'paiement_compte_cb', 'paiement_compte_cash', 'ecart_cb', 'ecart_cash',
+  'statut', 'created_by', 'updated_by',
+])
+
 export async function upsertCaisse(
   id: string | null,
   data: Record<string, unknown>,
@@ -12,8 +36,12 @@ export async function upsertCaisse(
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Non authentifié.' }
 
+  const filtered = Object.fromEntries(
+    Object.entries(data).filter(([k]) => VALID_CAISSE_COLUMNS.has(k))
+  )
+
   const payload = {
-    ...data,
+    ...filtered,
     tag_id: data.tag_id === '' ? null : data.tag_id,
     updated_by: user.id,
     ...(id ? {} : { created_by: user.id }),
