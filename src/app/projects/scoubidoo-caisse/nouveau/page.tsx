@@ -11,8 +11,19 @@ export default async function NouveauServicePage() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const today = new Date().toISOString().split('T')[0]
-  const [tags, veille] = await Promise.all([getTags(), getVeilleData(today)])
+  // Si on est entre minuit et 5h du matin (heure de Paris), on utilise la date de la veille
+  const now = new Date()
+  const hourParis = parseInt(
+    now.toLocaleString('fr-FR', { timeZone: 'Europe/Paris', hour: 'numeric', hour12: false }),
+    10,
+  )
+  const defaultDate = new Date(
+    now.toLocaleString('en-CA', { timeZone: 'Europe/Paris' }).split(',')[0]
+  )
+  if (hourParis < 5) defaultDate.setDate(defaultDate.getDate() - 1)
+  const dateStr = defaultDate.toISOString().split('T')[0]
+
+  const [tags, veille] = await Promise.all([getTags(), getVeilleData(dateStr)])
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100">
@@ -26,7 +37,7 @@ export default async function NouveauServicePage() {
         <CaisseFormClient
           tags={tags}
           veille={veille}
-          defaultDate={today}
+          defaultDate={dateStr}
           caisseId={null}
           initialData={null}
         />
