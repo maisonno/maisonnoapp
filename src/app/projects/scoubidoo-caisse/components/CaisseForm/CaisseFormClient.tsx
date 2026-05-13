@@ -119,6 +119,11 @@ export default function CaisseFormClient({ tags, veille, defaultDate, caisseId, 
     return true
   }, [form, currentId])
 
+  const goTo = async (target: number) => {
+    const ok = await saveProgress()
+    if (ok) setStep(target)
+  }
+
   const goNext = async () => {
     const ok = await saveProgress()
     if (ok) setStep((s) => Math.min(s + 1, 8))
@@ -152,7 +157,7 @@ export default function CaisseFormClient({ tags, veille, defaultDate, caisseId, 
         {STEPS.map((s) => (
           <button
             key={s.id}
-            onClick={() => setStep(s.id)}
+            onClick={() => goTo(s.id)}
             className={`shrink-0 px-3 py-2.5 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
               step === s.id
                 ? 'border-blue-500 text-blue-400'
