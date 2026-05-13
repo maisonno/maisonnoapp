@@ -103,6 +103,8 @@ type SPImportResult = {
   sp_pourboire_j?: number
   sp_cb_jplus1_pourboire_incl?: number
   sp_pourboire_jplus1?: number
+  j_count?: number
+  jplus1_count?: number
 }
 
 function nextDayYYYYMMDD(date: string): string {
@@ -160,5 +162,7 @@ export async function importSmileAndPay(serviceDate: string): Promise<SPImportRe
     sp_pourboire_j: sumField(jTx, 'tipsAmount'),
     sp_cb_jplus1_pourboire_incl: sumField(jPlus1Tx, 'amount'),
     sp_pourboire_jplus1: sumField(jPlus1Tx, 'tipsAmount'),
+    j_count: jTx.length,
+    jplus1_count: jPlus1Tx.length,
   }
 }

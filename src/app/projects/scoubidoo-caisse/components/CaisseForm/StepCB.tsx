@@ -89,11 +89,23 @@ export default function StepCB({ form, setNum, calc }: Props) {
       return
     }
 
+    const jCount = result.j_count ?? 0
+    const jPlus1Count = result.jplus1_count ?? 0
+
+    if (jCount === 0 && jPlus1Count === 0) {
+      setImportStatus({ ok: false, msg: `Aucune transaction S&P trouvée pour le ${form.date}.` })
+      return
+    }
+
+    const fmt = (v: number) => v.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })
     setNum('sp_cb_j_pourboire_incl', String(result.sp_cb_j_pourboire_incl ?? 0))
     setNum('sp_pourboire_j', String(result.sp_pourboire_j ?? 0))
     setNum('sp_cb_jplus1_pourboire_incl', String(result.sp_cb_jplus1_pourboire_incl ?? 0))
     setNum('sp_pourboire_jplus1', String(result.sp_pourboire_jplus1 ?? 0))
-    setImportStatus({ ok: true, msg: `Importé pour le ${form.date}.` })
+    setImportStatus({
+      ok: true,
+      msg: `J : ${jCount} tx → ${fmt(result.sp_cb_j_pourboire_incl ?? 0)} (dont ${fmt(result.sp_pourboire_j ?? 0)} pourboire) | J+1 : ${jPlus1Count} tx → ${fmt(result.sp_cb_jplus1_pourboire_incl ?? 0)}`,
+    })
   }
 
   const prefillBadge = (
