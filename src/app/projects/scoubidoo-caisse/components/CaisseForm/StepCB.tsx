@@ -2,12 +2,14 @@
 
 import { useState } from 'react'
 import type { CaisseFields } from '../../lib/types'
+import type { ImportedTransaction } from '../../actions'
 import { computeAll } from '../../lib/formulas'
 import { importSmileAndPay } from '../../actions'
 
 type Props = {
   form: CaisseFields & { date: string }
   setNum: (field: string, value: string) => void
+  set: (field: string, value: unknown) => void
   calc: ReturnType<typeof computeAll>
 }
 
@@ -69,10 +71,109 @@ function CalcRow({ label, value, highlight, delta }: { label: string; value: num
   )
 }
 
-export default function StepCB({ form, setNum, calc }: Props) {
+function formatTime(hhmmss: string): string {
+  return hhmmss.slice(0, 2) + ':' + hhmmss.slice(2, 4)
+}
+
+const PERIOD_LABELS: Record<string, string> = {
+  J_AM: 'J 00h–5h',
+  J: 'J soir',
+  J1_AM: 'J+1 00h–5h',
+}
+
+const PERIOD_BADGE_CLASSES: Record<string, string> = {
+  J_AM: 'bg-amber-900/50 text-amber-300 border border-amber-700',
+  J: 'bg-blue-900/50 text-blue-300 border border-blue-700',
+  J1_AM: 'bg-emerald-900/50 text-emerald-300 border border-emerald-700',
+}
+
+function TransactionPopup({
+  transactions,
+  date,
+  onClose,
+}: {
+  transactions: ImportedTransaction[]
+  date: string
+  onClose: () => void
+}) {
+  const fmt = (v: number) => v.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })
+
+  const jTxs = transactions.filter(tx => tx.period === 'J' || tx.period === 'J_AM')
+  const j1Txs = transactions.filter(tx => tx.period === 'J1_AM')
+  const jTotal = jTxs.reduce((acc, tx) => acc + tx.amount, 0)
+  const j1Total = j1Txs.reduce((acc, tx) => acc + tx.amount, 0)
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70"
+      onClick={onClose}
+    >
+      <div
+        className="relative bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl w-full max-w-lg mx-4 max-h-[80vh] flex flex-col"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-700">
+          <h2 className="text-base font-semibold">Transactions S&amp;P — {date}</h2>
+          <button
+            type="button"
+            onClick={onClose}
+            className="text-slate-400 hover:text-slate-200 text-xl leading-none"
+            aria-label="Fermer"
+          >
+            ✕
+          </button>
+        </div>
+
+        {/* Table */}
+        <div className="overflow-y-auto flex-1 px-2">
+          <table className="w-full text-xs">
+            <thead className="sticky top-0 bg-slate-900">
+              <tr className="text-slate-500 border-b border-slate-800">
+                <th className="text-left py-2 px-2 font-medium">Période</th>
+                <th className="text-left py-2 px-2 font-medium">Heure</th>
+                <th className="text-right py-2 px-2 font-medium">Montant</th>
+                <th className="text-right py-2 px-2 font-medium">Pourboire</th>
+                <th className="text-left py-2 px-2 font-medium">Carte</th>
+              </tr>
+            </thead>
+            <tbody>
+              {transactions.map((tx, i) => (
+                <tr key={i} className="border-b border-slate-800/60 hover:bg-slate-800/30">
+                  <td className="py-1.5 px-2">
+                    <span className={`inline-block text-[10px] px-1.5 py-0.5 rounded font-medium ${PERIOD_BADGE_CLASSES[tx.period] ?? ''}`}>
+                      {PERIOD_LABELS[tx.period] ?? tx.period}
+                    </span>
+                  </td>
+                  <td className="py-1.5 px-2 font-mono text-slate-300">{formatTime(tx.time)}</td>
+                  <td className="py-1.5 px-2 font-mono text-right text-slate-200">{fmt(tx.amount)}</td>
+                  <td className="py-1.5 px-2 font-mono text-right text-slate-400">
+                    {tx.tipsAmount > 0 ? fmt(tx.tipsAmount) : ''}
+                  </td>
+                  <td className="py-1.5 px-2 text-slate-400">{tx.cardBrand}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Summary footer */}
+        <div className="px-5 py-3 border-t border-slate-700 text-xs text-slate-400">
+          J total : {jTxs.length} tx = {fmt(jTotal)}
+          {' | '}
+          J+1 00h–5h : {j1Txs.length} tx = {fmt(j1Total)}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+export default function StepCB({ form, setNum, set, calc }: Props) {
   const [showAutre, setShowAutre] = useState(false)
   const [importing, setImporting] = useState(false)
   const [importStatus, setImportStatus] = useState<{ ok: boolean; msg: string } | null>(null)
+  const [showTransactions, setShowTransactions] = useState(false)
+  const [jAmComparison, setJAmComparison] = useState<{ actual: number; stored: number } | null>(null)
 
   const handleImport = async () => {
     if (!form.date) {
@@ -81,6 +182,7 @@ export default function StepCB({ form, setNum, calc }: Props) {
     }
     setImporting(true)
     setImportStatus(null)
+    setJAmComparison(null)
     const result = await importSmileAndPay(form.date)
     setImporting(false)
 
@@ -102,6 +204,18 @@ export default function StepCB({ form, setNum, calc }: Props) {
     setNum('sp_pourboire_j', String(result.sp_pourboire_j ?? 0))
     setNum('sp_cb_jplus1_pourboire_incl', String(result.sp_cb_jplus1_pourboire_incl ?? 0))
     setNum('sp_pourboire_jplus1', String(result.sp_pourboire_jplus1 ?? 0))
+
+    if (result.transactions) {
+      set('sp_transactions_json', result.transactions)
+    }
+
+    // Comparison: J_AM actual vs stored veille value
+    const jAmActual = result.j_am_amount ?? 0
+    const stored = form.sp_cb_jplus1_veille_pourboire_incl ?? 0
+    if (Math.abs(jAmActual - stored) > 0.01) {
+      setJAmComparison({ actual: jAmActual, stored })
+    }
+
     setImportStatus({
       ok: true,
       msg: `J : ${jCount} tx → ${fmt(result.sp_cb_j_pourboire_incl ?? 0)} (dont ${fmt(result.sp_pourboire_j ?? 0)} pourboire) | J+1 : ${jPlus1Count} tx → ${fmt(result.sp_cb_jplus1_pourboire_incl ?? 0)}`,
@@ -114,27 +228,40 @@ export default function StepCB({ form, setNum, calc }: Props) {
     </span>
   )
 
+  const storedTransactions = (form.sp_transactions_json ?? []) as ImportedTransaction[]
+
   return (
     <div className="space-y-5">
       <div className="flex items-center justify-between gap-3">
         <h2 className="text-lg font-semibold">Encaissements CB</h2>
-        <button
-          type="button"
-          onClick={handleImport}
-          disabled={importing}
-          className="shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-sm font-medium transition-colors disabled:opacity-50"
-        >
-          {importing ? (
-            <>
-              <span className="animate-spin text-base">⟳</span>
-              Chargement…
-            </>
-          ) : (
-            <>
-              ↓ Importer S&amp;P
-            </>
+        <div className="flex items-center gap-2">
+          {storedTransactions.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setShowTransactions(true)}
+              className="shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-sm font-medium transition-colors"
+            >
+              Voir les transactions ({storedTransactions.length})
+            </button>
           )}
-        </button>
+          <button
+            type="button"
+            onClick={handleImport}
+            disabled={importing}
+            className="shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-sm font-medium transition-colors disabled:opacity-50"
+          >
+            {importing ? (
+              <>
+                <span className="animate-spin text-base">⟳</span>
+                Chargement…
+              </>
+            ) : (
+              <>
+                ↓ Importer S&amp;P
+              </>
+            )}
+          </button>
+        </div>
       </div>
 
       {importStatus && (
@@ -144,6 +271,16 @@ export default function StepCB({ form, setNum, calc }: Props) {
             : 'bg-red-950/40 border-red-800 text-red-300'
         }`}>
           {importStatus.msg}
+        </div>
+      )}
+
+      {jAmComparison && (
+        <div className="rounded-xl px-4 py-2.5 text-sm border bg-amber-950/40 border-amber-700 text-amber-300">
+          ⚠️ Minuit–5h du {form.date} : S&amp;P remonte{' '}
+          {jAmComparison.actual.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })}
+          {' '}mais{' '}
+          {jAmComparison.stored.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })}
+          {' '}avait été enregistré pour le service précédent.
         </div>
       )}
 
@@ -214,6 +351,15 @@ export default function StepCB({ form, setNum, calc }: Props) {
         <CalcRow label="CA CB (net − différés)" value={calc.ca_cb} highlight />
         <CalcRow label="Delta CB v1" value={calc.delta_cb_v1} delta />
       </div>
+
+      {/* Transaction popup */}
+      {showTransactions && storedTransactions.length > 0 && (
+        <TransactionPopup
+          transactions={storedTransactions}
+          date={form.date}
+          onClose={() => setShowTransactions(false)}
+        />
+      )}
     </div>
   )
 }

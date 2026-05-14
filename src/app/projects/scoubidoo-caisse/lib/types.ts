@@ -58,6 +58,7 @@ export type CaisseFields = {
   sp_pourboire_j?: number | null
   sp_pourboire_jplus1?: number | null
   sp_pourboire_jplus1_de_la_veille?: number | null
+  sp_transactions_json?: object[] | null
   // G2. Autre service CB
   autre_cb_j_pourboire_incl?: number | null
   autre_cb_jplus1_pourboire_incl?: number | null

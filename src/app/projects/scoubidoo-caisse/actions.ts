@@ -21,6 +21,7 @@ const VALID_CAISSE_COLUMNS = new Set([
   'payplus_cumul_pourboire', 'payplus_pourboire_service',
   'sp_cb_j_pourboire_incl', 'sp_cb_jplus1_pourboire_incl', 'sp_cb_jplus1_veille_pourboire_incl',
   'sp_pourboire_j', 'sp_pourboire_jplus1', 'sp_pourboire_jplus1_de_la_veille',
+  'sp_transactions_json',
   'autre_cb_j_pourboire_incl', 'autre_cb_jplus1_pourboire_incl', 'autre_cb_jplus1_veille_pourboire_incl',
   'autre_pourboire_j', 'autre_pourboire_jplus1', 'autre_pourboire_jplus1_de_la_veille',
   'pourboire_tpe_verse_au_pourboire', 'trop_percu_verse_au_pourboire',
@@ -92,27 +93,22 @@ export async function deleteCaisse(id: string): Promise<ActionState> {
 
 type SPTransaction = {
   transactionDate: string   // "YYYYMMDD" ou "DD/MM/YYYY" selon l'API
+  transactionTime?: string  // "HHMMSS"
   amount: number
   tipsAmount: number
+  cardBrand?: string
   transactionResponseStatus?: boolean | null
   stateId?: number
 }
 
-function matchesDate(txDate: string, serviceDate: string): boolean {
-  // Accepte "20260512" (YYYYMMDD) et "12/05/2026" (DD/MM/YYYY)
-  const compact = serviceDate.replace(/-/g, '')            // "20260512"
-  const [y, m, d] = serviceDate.split('-')
-  const fr = `${d}/${m}/${y}`                              // "12/05/2026"
-  return txDate === compact || txDate === fr
-}
-
-function matchesNextDay(txDate: string, serviceDate: string): boolean {
-  const next = nextDayYYYYMMDD(serviceDate)               // "20260513"
-  const d = new Date(serviceDate + 'T12:00:00Z')
-  d.setUTCDate(d.getUTCDate() + 1)
-  const [ny, nm, nd2] = d.toISOString().slice(0, 10).split('-')
-  const nextFr = `${nd2}/${nm}/${ny}`                      // "13/05/2026"
-  return txDate === next || txDate === nextFr
+export type ImportedTransaction = {
+  ref: string
+  date: string
+  time: string     // HHMMSS
+  amount: number
+  tipsAmount: number
+  cardBrand: string
+  period: 'J_AM' | 'J' | 'J1_AM'
 }
 
 type SPImportResult = {
@@ -123,6 +119,9 @@ type SPImportResult = {
   sp_pourboire_jplus1?: number
   j_count?: number
   jplus1_count?: number
+  j_am_amount?: number
+  j_am_pourboire?: number
+  transactions?: ImportedTransaction[]
 }
 
 function nextDayYYYYMMDD(date: string): string {
@@ -131,8 +130,51 @@ function nextDayYYYYMMDD(date: string): string {
   return d.toISOString().slice(0, 10).replace(/-/g, '')
 }
 
-function sumField(txs: SPTransaction[], field: 'amount' | 'tipsAmount'): number {
-  return Math.round(txs.reduce((acc, tx) => acc + (tx[field] ?? 0), 0) * 100) / 100
+function nextDayFR(date: string): string {
+  const d = new Date(date + 'T12:00:00Z')
+  d.setUTCDate(d.getUTCDate() + 1)
+  const [ny, nm, nd2] = d.toISOString().slice(0, 10).split('-')
+  return `${nd2}/${nm}/${ny}`
+}
+
+function serviceDateCompact(date: string): string {
+  return date.replace(/-/g, '')
+}
+
+function serviceDateFR(date: string): string {
+  const [y, m, d] = date.split('-')
+  return `${d}/${m}/${y}`
+}
+
+function isEarlyMorning(time: string): boolean {
+  // time is HHMMSS — 00:00–04:59 counts as "AM" (< 5)
+  return parseInt(time.slice(0, 2), 10) < 5
+}
+
+function assignPeriod(
+  tx: SPTransaction,
+  jCompact: string,
+  jFR: string,
+  nextDayCompact: string,
+  nextDayFrStr: string,
+): 'J_AM' | 'J' | 'J1_AM' | null {
+  const txDate = tx.transactionDate
+  const time = tx.transactionTime ?? '120000'
+
+  if (txDate === jCompact || txDate === jFR) {
+    return isEarlyMorning(time) ? 'J_AM' : 'J'
+  }
+  if (txDate === nextDayCompact || txDate === nextDayFrStr) {
+    return isEarlyMorning(time) ? 'J1_AM' : null
+  }
+  return null
+}
+
+function sumByPeriods(txs: Array<{ amount: number; tipsAmount: number; period: 'J_AM' | 'J' | 'J1_AM' }>, periods: Array<'J_AM' | 'J' | 'J1_AM'>, field: 'amount' | 'tipsAmount'): number {
+  return Math.round(
+    txs.filter(tx => periods.includes(tx.period))
+      .reduce((acc, tx) => acc + (tx[field] ?? 0), 0) * 100
+  ) / 100
 }
 
 export async function importSmileAndPay(serviceDate: string): Promise<SPImportResult> {
@@ -157,28 +199,55 @@ export async function importSmileAndPay(serviceDate: string): Promise<SPImportRe
     return { error: 'Impossible de joindre l\'API Smile & Pay.' }
   }
 
-  let transactions: SPTransaction[]
+  let rawTransactions: SPTransaction[]
   try {
     const txRes = await fetch('https://extranet-api.smileandpay.com/public/api/v1/transactions', {
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
     })
     if (!txRes.ok) return { error: `Récupération des transactions échouée (${txRes.status}).` }
-    transactions = await txRes.json()
+    rawTransactions = await txRes.json()
   } catch {
     return { error: 'Erreur lors de la récupération des transactions.' }
   }
 
-  // Pas de filtre sur transactionResponseStatus — peut être absent/null dans la vraie API
-  // On inclut toutes les transactions (les remboursements ont des montants négatifs)
-  const jTx = transactions.filter((tx) => matchesDate(tx.transactionDate, serviceDate))
-  const jPlus1Tx = transactions.filter((tx) => matchesNextDay(tx.transactionDate, serviceDate))
+  const jCompact = serviceDateCompact(serviceDate)
+  const jFR = serviceDateFR(serviceDate)
+  const nextCompact = nextDayYYYYMMDD(serviceDate)
+  const nextFR = nextDayFR(serviceDate)
+
+  // Assign period to each transaction, filter out irrelevant ones
+  const categorized: Array<ImportedTransaction & { sortKey: string }> = []
+
+  rawTransactions.forEach((tx, idx) => {
+    const period = assignPeriod(tx, jCompact, jFR, nextCompact, nextFR)
+    if (period === null) return
+    categorized.push({
+      ref: String(idx),
+      date: tx.transactionDate,
+      time: tx.transactionTime ?? '000000',
+      amount: tx.amount ?? 0,
+      tipsAmount: tx.tipsAmount ?? 0,
+      cardBrand: tx.cardBrand ?? '',
+      period,
+      sortKey: tx.transactionDate + (tx.transactionTime ?? '000000'),
+    })
+  })
+
+  // Sort descending by date+time
+  categorized.sort((a, b) => b.sortKey.localeCompare(a.sortKey))
+
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const transactions: ImportedTransaction[] = categorized.map(({ sortKey: _sortKey, ...rest }) => rest)
 
   return {
-    sp_cb_j_pourboire_incl: sumField(jTx, 'amount'),
-    sp_pourboire_j: sumField(jTx, 'tipsAmount'),
-    sp_cb_jplus1_pourboire_incl: sumField(jPlus1Tx, 'amount'),
-    sp_pourboire_jplus1: sumField(jPlus1Tx, 'tipsAmount'),
-    j_count: jTx.length,
-    jplus1_count: jPlus1Tx.length,
+    sp_cb_j_pourboire_incl: sumByPeriods(transactions, ['J', 'J_AM'], 'amount'),
+    sp_pourboire_j: sumByPeriods(transactions, ['J', 'J_AM'], 'tipsAmount'),
+    sp_cb_jplus1_pourboire_incl: sumByPeriods(transactions, ['J1_AM'], 'amount'),
+    sp_pourboire_jplus1: sumByPeriods(transactions, ['J1_AM'], 'tipsAmount'),
+    j_count: transactions.filter(tx => tx.period === 'J' || tx.period === 'J_AM').length,
+    jplus1_count: transactions.filter(tx => tx.period === 'J1_AM').length,
+    j_am_amount: sumByPeriods(transactions, ['J_AM'], 'amount'),
+    j_am_pourboire: sumByPeriods(transactions, ['J_AM'], 'tipsAmount'),
+    transactions,
   }
 }
