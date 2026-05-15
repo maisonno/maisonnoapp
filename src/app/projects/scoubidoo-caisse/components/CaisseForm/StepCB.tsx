@@ -77,7 +77,7 @@ function formatTime(hhmmss: string): string {
 
 const PERIOD_LABELS: Record<string, string> = {
   J_AM: 'J 00h–5h',
-  J: 'J soir',
+  J: 'J 5h–Minuit',
   J1_AM: 'J+1 00h–5h',
 }
 
@@ -98,8 +98,10 @@ function TransactionPopup({
 }) {
   const fmt = (v: number) => v.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })
 
-  const jTxs = transactions.filter(tx => tx.period === 'J' || tx.period === 'J_AM')
+  const jAmTxs = transactions.filter(tx => tx.period === 'J_AM')
+  const jTxs = transactions.filter(tx => tx.period === 'J')
   const j1Txs = transactions.filter(tx => tx.period === 'J1_AM')
+  const jAmTotal = jAmTxs.reduce((acc, tx) => acc + tx.amount, 0)
   const jTotal = jTxs.reduce((acc, tx) => acc + tx.amount, 0)
   const j1Total = j1Txs.reduce((acc, tx) => acc + tx.amount, 0)
 
@@ -158,10 +160,10 @@ function TransactionPopup({
         </div>
 
         {/* Summary footer */}
-        <div className="px-5 py-3 border-t border-slate-700 text-xs text-slate-400">
-          J total : {jTxs.length} tx = {fmt(jTotal)}
-          {' | '}
-          J+1 00h–5h : {j1Txs.length} tx = {fmt(j1Total)}
+        <div className="px-5 py-3 border-t border-slate-700 text-xs text-slate-400 flex flex-wrap gap-x-4 gap-y-1">
+          <span>J 00h–5h : {jAmTxs.length} tx = {fmt(jAmTotal)}</span>
+          <span>J 5h–Minuit : {jTxs.length} tx = {fmt(jTotal)}</span>
+          <span>J+1 00h–5h : {j1Txs.length} tx = {fmt(j1Total)}</span>
         </div>
       </div>
     </div>
