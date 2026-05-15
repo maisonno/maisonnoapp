@@ -75,7 +75,8 @@ export default function CaisseFormClient({ tags, veille, defaultDate, caisseId, 
         const saved = localStorage.getItem(DRAFT_KEY)
         if (saved) {
           const parsed = JSON.parse(saved)
-          return { ...parsed, date: defaultDate }
+          if (parsed.date === defaultDate) return parsed
+          localStorage.removeItem(DRAFT_KEY)
         }
       } catch {}
     }
