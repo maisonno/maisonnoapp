@@ -124,8 +124,8 @@ export default function CaisseFormClient({ tags, veille, defaultDate, caisseId, 
   }, [form, currentId])
 
   const goTo = async (target: number) => {
-    const ok = await saveProgress()
-    if (ok) setStep(target)
+    await saveProgress()
+    setStep(target)
   }
 
   const goNext = async () => {
