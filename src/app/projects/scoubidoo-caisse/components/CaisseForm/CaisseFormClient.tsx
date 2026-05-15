@@ -73,7 +73,10 @@ export default function CaisseFormClient({ tags, veille, defaultDate, caisseId, 
     if (typeof window !== 'undefined') {
       try {
         const saved = localStorage.getItem(DRAFT_KEY)
-        if (saved) return JSON.parse(saved)
+        if (saved) {
+          const parsed = JSON.parse(saved)
+          return { ...parsed, date: defaultDate }
+        }
       } catch {}
     }
     return buildInitial(null, veille, defaultDate)
