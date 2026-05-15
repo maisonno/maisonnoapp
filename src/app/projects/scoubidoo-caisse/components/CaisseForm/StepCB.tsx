@@ -26,29 +26,29 @@ function CBRow({ label, cbField, cbValue, pourField, pourValue, onChange, badge 
         <span className="text-xs font-medium text-slate-300 flex-1">{label}</span>
         {badge}
       </div>
-      <div className="flex gap-2">
-        <div className="flex-1">
+      <div className="grid grid-cols-[1fr_7rem] gap-2">
+        <div className="min-w-0">
           <div className="text-[10px] text-slate-500 mb-0.5">Encaissement (pourboire inclus)</div>
           <div className="flex items-center gap-1">
             <input type="number" inputMode="decimal" step="0.01"
               value={cbValue ?? ''}
               onChange={(e) => onChange(cbField, e.target.value)}
-              className="flex-1 bg-slate-800 border border-slate-600 rounded-lg px-2 py-2 text-right text-sm font-mono focus:outline-none focus:border-blue-500"
+              className="w-full bg-slate-800 border border-slate-600 rounded-lg px-2 py-2 text-right text-sm font-mono focus:outline-none focus:border-blue-500"
               placeholder="0,00"
             />
-            <span className="text-xs text-slate-500">€</span>
+            <span className="text-xs text-slate-500 shrink-0">€</span>
           </div>
         </div>
-        <div className="w-28">
+        <div className="min-w-0">
           <div className="text-[10px] text-slate-500 mb-0.5">Pourboire</div>
           <div className="flex items-center gap-1">
             <input type="number" inputMode="decimal" step="0.01"
               value={pourValue ?? ''}
               onChange={(e) => onChange(pourField, e.target.value)}
-              className="flex-1 bg-slate-800 border border-slate-600 rounded-lg px-2 py-2 text-right text-sm font-mono focus:outline-none focus:border-blue-500"
+              className="w-full bg-slate-800 border border-slate-600 rounded-lg px-2 py-2 text-right text-sm font-mono focus:outline-none focus:border-blue-500"
               placeholder="0,00"
             />
-            <span className="text-xs text-slate-500">€</span>
+            <span className="text-xs text-slate-500 shrink-0">€</span>
           </div>
         </div>
       </div>
@@ -288,20 +288,20 @@ export default function StepCB({ form, setNum, set, calc }: Props) {
       <section className="space-y-4">
         <h3 className="text-sm font-medium text-slate-300">Smile &amp; Pay</h3>
         <CBRow
-          label="J — Service du soir"
+          label="J — Service du jour"
           cbField="sp_cb_j_pourboire_incl" cbValue={form.sp_cb_j_pourboire_incl}
           pourField="sp_pourboire_j" pourValue={form.sp_pourboire_j}
           onChange={setNum}
         />
         <CBRow
-          label="J+1 — De minuit à la fermeture (hier soir)"
+          label="J — De minuit à 5h (hier soir)"
           cbField="sp_cb_jplus1_veille_pourboire_incl" cbValue={form.sp_cb_jplus1_veille_pourboire_incl}
           pourField="sp_pourboire_jplus1_de_la_veille" pourValue={form.sp_pourboire_jplus1_de_la_veille}
           onChange={setNum}
           badge={form.sp_cb_jplus1_veille_pourboire_incl != null ? prefillBadge : undefined}
         />
         <CBRow
-          label="J+1 — De minuit à la fermeture (ce soir)"
+          label="J+1 — De minuit à 5h (ce soir)"
           cbField="sp_cb_jplus1_pourboire_incl" cbValue={form.sp_cb_jplus1_pourboire_incl}
           pourField="sp_pourboire_jplus1" pourValue={form.sp_pourboire_jplus1}
           onChange={setNum}
@@ -321,20 +321,20 @@ export default function StepCB({ form, setNum, set, calc }: Props) {
         {showAutre && (
           <div className="space-y-4 mt-4">
             <CBRow
-              label="J — Service du soir"
+              label="J — Service du jour"
               cbField="autre_cb_j_pourboire_incl" cbValue={form.autre_cb_j_pourboire_incl}
               pourField="autre_pourboire_j" pourValue={form.autre_pourboire_j}
               onChange={setNum}
             />
             <CBRow
-              label="J+1 — De minuit à la fermeture (hier soir)"
+              label="J — De minuit à 5h (hier soir)"
               cbField="autre_cb_jplus1_veille_pourboire_incl" cbValue={form.autre_cb_jplus1_veille_pourboire_incl}
               pourField="autre_pourboire_jplus1_de_la_veille" pourValue={form.autre_pourboire_jplus1_de_la_veille}
               onChange={setNum}
               badge={form.autre_cb_jplus1_veille_pourboire_incl != null ? prefillBadge : undefined}
             />
             <CBRow
-              label="J+1 — De minuit à la fermeture (ce soir)"
+              label="J+1 — De minuit à 5h (ce soir)"
               cbField="autre_cb_jplus1_pourboire_incl" cbValue={form.autre_cb_jplus1_pourboire_incl}
               pourField="autre_pourboire_jplus1" pourValue={form.autre_pourboire_jplus1}
               onChange={setNum}
