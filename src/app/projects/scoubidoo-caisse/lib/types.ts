@@ -74,6 +74,19 @@ export type CaisseFields = {
   ecart_cash?: number | null
   paiement_compte_cb?: number | null
   paiement_compte_cash?: number | null
+  // J. Fond de caisse — détail coupures
+  fond_billets_500?: number | null
+  fond_billets_200?: number | null
+  fond_billets_100?: number | null
+  fond_billets_50?: number | null
+  fond_billets_20?: number | null
+  fond_billets_10?: number | null
+  fond_billets_5?: number | null
+  fond_pieces_2?: number | null
+  fond_pieces_1?: number | null
+  fond_pieces_50c?: number | null
+  fond_pieces_20c?: number | null
+  fond_pieces_10c?: number | null
 }
 
 export type Caisse = CaisseFields & {

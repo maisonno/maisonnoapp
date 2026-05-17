@@ -27,6 +27,9 @@ const VALID_CAISSE_COLUMNS = new Set([
   'pourboire_tpe_verse_au_pourboire', 'trop_percu_verse_au_pourboire',
   'paiement_compte_cb', 'paiement_compte_cash', 'ecart_cb', 'ecart_cash',
   'statut', 'created_by', 'updated_by',
+  'fond_billets_500', 'fond_billets_200', 'fond_billets_100', 'fond_billets_50',
+  'fond_billets_20', 'fond_billets_10', 'fond_billets_5',
+  'fond_pieces_2', 'fond_pieces_1', 'fond_pieces_50c', 'fond_pieces_20c', 'fond_pieces_10c',
 ])
 
 export async function upsertCaisse(
