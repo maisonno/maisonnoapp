@@ -68,6 +68,7 @@ export default function StepRepartition({ form, setNum, calc }: Props) {
         <Row label="Poire" value={form.poire} onChange={(v) => setNum('poire', v)} hint="Versement à la Poire" />
         <Row label="Pomme (Coffre)" value={form.mis_au_coffre} onChange={(v) => setNum('mis_au_coffre', v)} hint="Mise au coffre La Pomme" />
         <Row label="Versement pourboire" value={form.pourboire_tpe_verse_au_pourboire} onChange={(v) => setNum('pourboire_tpe_verse_au_pourboire', v)} />
+        <Row label="Ajout monnaie" value={form.ajout_monnaie} onChange={(v) => setNum('ajout_monnaie', v)} hint="Appoint pour compléter le fond" />
       </section>
 
       {/* Reste en caisse */}

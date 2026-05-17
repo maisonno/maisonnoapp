@@ -73,22 +73,6 @@ export default function StepCloture({ form, setNum, calc }: Props) {
         </div>
       </section>
 
-      {/* Ajout monnaie */}
-      <div className="flex items-center justify-between gap-3 pt-3 border-t border-slate-700">
-        <div>
-          <label className="text-sm text-slate-300 block">Ajout monnaie</label>
-          <p className="text-xs text-slate-500">Appoint pour compléter le fond</p>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <input type="number" inputMode="decimal" step="0.01"
-            value={form.ajout_monnaie ?? ''}
-            onChange={(e) => setNum('ajout_monnaie', e.target.value)}
-            className="w-32 bg-slate-800 border border-slate-600 rounded-lg px-2 py-2 text-right text-sm font-mono focus:outline-none focus:border-blue-500"
-            placeholder="0,00"
-          />
-          <span className="text-xs text-slate-500">€</span>
-        </div>
-      </div>
 
       {/* Fond de caisse L'Addition */}
       <div className="flex items-center justify-between gap-3">
