@@ -1,8 +1,10 @@
 -- Recréer la vue pour inclure les colonnes ajoutées par 0006 et 0007
 -- (reglement_service_cash_v2, total_service_ttc, sp_transactions_json, etc.)
--- PostgreSQL gèle l'expansion de c.* à la création ; un CREATE OR REPLACE suffit.
+-- DROP requis car CREATE OR REPLACE ne peut pas changer l'ordre des colonnes.
 
-create or replace view scd_v_caisse_calc as
+drop view if exists scd_v_caisse_calc;
+
+create view scd_v_caisse_calc as
 with base as (
   select
     c.*,
