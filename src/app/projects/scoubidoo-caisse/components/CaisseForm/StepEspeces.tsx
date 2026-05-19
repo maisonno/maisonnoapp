@@ -103,7 +103,7 @@ export default function StepEspeces({ form, setInt, setNum, calc }: Props) {
                     value={qty === 0 ? '' : qty}
                     onChange={(e) => setInt(qtyField, parseInt(e.target.value) || 0)}
                     placeholder="0"
-                    className="flex-1 min-w-0 bg-slate-800 border border-slate-600 rounded-lg px-1 py-2 text-center text-sm font-mono font-semibold focus:outline-none focus:border-blue-500"
+                    className="w-14 bg-slate-800 border border-slate-600 rounded-lg px-1 py-2 text-center text-sm font-mono font-semibold focus:outline-none focus:border-blue-500"
                   />
                   <StepBtn onClick={() => setInt(qtyField, qty + 1)}>+</StepBtn>
                 </div>
