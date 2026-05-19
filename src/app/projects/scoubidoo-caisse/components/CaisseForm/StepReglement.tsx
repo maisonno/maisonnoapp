@@ -1,5 +1,6 @@
 'use client'
 
+import { useEffect } from 'react'
 import type { CaisseFields } from '../../lib/types'
 import { computeAll } from '../../lib/formulas'
 
@@ -31,6 +32,13 @@ function Row({ label, value, onChange, hint }: {
 }
 
 export default function StepReglement({ form, setNum, calc }: Props) {
+  useEffect(() => {
+    if (form.reglement_service_cash_v2 == null && form.reglement_service_cash != null) {
+      setNum('reglement_service_cash_v2', String(form.reglement_service_cash))
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   const deltaCBv2 = calc.delta_cb_v2
   const deltaTTC = calc.delta_ttc
   const cbOk = Math.abs(deltaCBv2) < 0.01
