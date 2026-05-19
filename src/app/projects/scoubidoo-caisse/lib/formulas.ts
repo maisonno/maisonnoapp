@@ -128,13 +128,12 @@ export function computeDeltaCloture(c: CaisseFields): number {
   return n(c.fond_caisse_soir) - computeResteEnCaisse(c) + n(c.ajout_monnaie)
 }
 
-// Pour la liste des services (backward compat)
+// Pour la liste des services
 export function computeFullCa(c: CaisseFields): number {
-  const cashV2 = c.reglement_service_cash_v2 != null
-    ? n(c.reglement_service_cash_v2)
-    : n(c.reglement_service_cash)
-  const totalCa = computeTotalCaisseSoir(c) - n(c.fond_caisse_matin) - n(c.mouvement_monnaie)
-  return totalCa + computeCACB(c) + cashV2
+  const ttc = c.total_service_ttc != null
+    ? n(c.total_service_ttc)
+    : computeTotalCAv2(c)
+  return ttc + n(c.poire)
 }
 
 export function computeDelta(c: CaisseFields): number {
