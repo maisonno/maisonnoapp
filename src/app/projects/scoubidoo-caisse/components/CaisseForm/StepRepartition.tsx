@@ -10,6 +10,18 @@ type Props = {
   calc: ReturnType<typeof computeAll>
 }
 
+function StepBtn({ onClick, children }: { onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="w-10 h-10 rounded-xl bg-slate-700 hover:bg-slate-600 active:bg-slate-500 text-lg font-bold transition-colors shrink-0 flex items-center justify-center"
+    >
+      {children}
+    </button>
+  )
+}
+
 const DENOMS: { caisseKey: keyof CaisseFields; fondKey: keyof CaisseFields; label: string; val: number }[] = [
   { caisseKey: 'billets_500', fondKey: 'fond_billets_500', label: '500 €', val: 500 },
   { caisseKey: 'billets_200', fondKey: 'fond_billets_200', label: '200 €', val: 200 },
@@ -134,21 +146,21 @@ export default function StepRepartition({ form, setNum, setInt, calc }: Props) {
               const fondQty = (form[d.fondKey] as number) ?? 0
               return (
                 <tr key={String(d.fondKey)} className="border-b border-slate-800/50">
-                  <td className="py-1.5 text-slate-400">{d.label}</td>
+                  <td className="py-1.5 text-slate-400 pr-2">{d.label}</td>
                   <td className="py-1.5 text-center font-mono text-slate-300">{caisseQty}</td>
                   <td className="py-1.5">
-                    <div className="flex items-center justify-center gap-1.5">
-                      <button
-                        type="button"
-                        onClick={() => handleFondChange(String(d.fondKey), fondQty - 1)}
-                        className="w-7 h-7 rounded-md bg-slate-700 hover:bg-slate-600 text-slate-300 font-bold text-sm leading-none transition-colors"
-                      >−</button>
-                      <span className="w-8 text-center font-mono text-sm text-slate-200">{fondQty}</span>
-                      <button
-                        type="button"
-                        onClick={() => handleFondChange(String(d.fondKey), fondQty + 1)}
-                        className="w-7 h-7 rounded-md bg-slate-700 hover:bg-slate-600 text-slate-300 font-bold text-sm leading-none transition-colors"
-                      >+</button>
+                    <div className="flex items-center gap-1">
+                      <StepBtn onClick={() => handleFondChange(String(d.fondKey), fondQty - 1)}>−</StepBtn>
+                      <input
+                        type="number"
+                        inputMode="numeric"
+                        min="0"
+                        value={fondQty === 0 ? '' : fondQty}
+                        onChange={(e) => handleFondChange(String(d.fondKey), parseInt(e.target.value) || 0)}
+                        placeholder="0"
+                        className="w-12 bg-slate-800 border border-slate-600 rounded-lg px-1 py-2 text-center text-sm font-mono font-semibold focus:outline-none focus:border-blue-500"
+                      />
+                      <StepBtn onClick={() => handleFondChange(String(d.fondKey), fondQty + 1)}>+</StepBtn>
                     </div>
                   </td>
                 </tr>
