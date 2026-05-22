@@ -154,6 +154,11 @@ function isEarlyMorning(time: string): boolean {
   return parseInt(time.slice(0, 2), 10) < 5
 }
 
+function normalizeDate(raw: string): string {
+  // Convert ISO "YYYY-MM-DD" → "YYYYMMDD" so it matches jCompact/nextCompact
+  return raw.replace(/-/g, '')
+}
+
 function assignPeriod(
   tx: SPTransaction,
   jCompact: string,
@@ -162,12 +167,13 @@ function assignPeriod(
   nextDayFrStr: string,
 ): 'J_AM' | 'J' | 'J1_AM' | null {
   const txDate = tx.transactionDate
+  const txDateNorm = normalizeDate(txDate)
   const time = tx.transactionTime ?? '120000'
 
-  if (txDate === jCompact || txDate === jFR) {
+  if (txDateNorm === jCompact || txDate === jFR) {
     return isEarlyMorning(time) ? 'J_AM' : 'J'
   }
-  if (txDate === nextDayCompact || txDate === nextDayFrStr) {
+  if (txDateNorm === nextDayCompact || txDate === nextDayFrStr) {
     return isEarlyMorning(time) ? 'J1_AM' : null
   }
   return null
@@ -210,12 +216,7 @@ export async function importSmileAndPay(serviceDate: string): Promise<SPImportRe
 
   let rawTransactions: SPTransaction[]
   try {
-    // Request transactions for J and J+1 explicitly so that re-importing a past service
-    // (or importing after midnight) picks up J+1 00h–5h transactions correctly.
-    const url = new URL('https://extranet-api.smileandpay.com/public/api/v1/transactions')
-    url.searchParams.set('startDate', jCompact)
-    url.searchParams.set('endDate', nextCompact)
-    const txRes = await fetch(url.toString(), {
+    const txRes = await fetch('https://extranet-api.smileandpay.com/public/api/v1/transactions', {
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
     })
     if (!txRes.ok) return { error: `Récupération des transactions échouée (${txRes.status}).` }
