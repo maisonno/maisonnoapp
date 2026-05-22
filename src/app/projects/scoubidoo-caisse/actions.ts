@@ -202,9 +202,20 @@ export async function importSmileAndPay(serviceDate: string): Promise<SPImportRe
     return { error: 'Impossible de joindre l\'API Smile & Pay.' }
   }
 
+  // Compute dates before the API call so we can pass them as filters
+  const jCompact = serviceDateCompact(serviceDate)
+  const jFR = serviceDateFR(serviceDate)
+  const nextCompact = nextDayYYYYMMDD(serviceDate)
+  const nextFR = nextDayFR(serviceDate)
+
   let rawTransactions: SPTransaction[]
   try {
-    const txRes = await fetch('https://extranet-api.smileandpay.com/public/api/v1/transactions', {
+    // Request transactions for J and J+1 explicitly so that re-importing a past service
+    // (or importing after midnight) picks up J+1 00h–5h transactions correctly.
+    const url = new URL('https://extranet-api.smileandpay.com/public/api/v1/transactions')
+    url.searchParams.set('startDate', jCompact)
+    url.searchParams.set('endDate', nextCompact)
+    const txRes = await fetch(url.toString(), {
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
     })
     if (!txRes.ok) return { error: `Récupération des transactions échouée (${txRes.status}).` }
@@ -212,11 +223,6 @@ export async function importSmileAndPay(serviceDate: string): Promise<SPImportRe
   } catch {
     return { error: 'Erreur lors de la récupération des transactions.' }
   }
-
-  const jCompact = serviceDateCompact(serviceDate)
-  const jFR = serviceDateFR(serviceDate)
-  const nextCompact = nextDayYYYYMMDD(serviceDate)
-  const nextFR = nextDayFR(serviceDate)
 
   // Assign period to each transaction, filter out irrelevant ones
   const categorized: Array<ImportedTransaction & { sortKey: string }> = []
