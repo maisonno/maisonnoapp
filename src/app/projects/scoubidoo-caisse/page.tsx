@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { getCaisseList } from './lib/queries'
 import ServiceList from './components/ServiceList'
+import ExportButton from './components/ExportButton'
 
 export const metadata = { title: 'Scoubidoo — Caisse' }
 
@@ -23,12 +24,15 @@ export default async function ScoubidooCaissePage() {
             </Link>
             <h1 className="text-2xl font-bold mt-1">Caisse — La Pomme</h1>
           </div>
-          <Link
-            href="/projects/scoubidoo-caisse/nouveau"
-            className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-5 py-3 rounded-xl text-sm transition-colors"
-          >
-            + Nouveau service
-          </Link>
+          <div className="flex items-center gap-2">
+            <ExportButton />
+            <Link
+              href="/projects/scoubidoo-caisse/nouveau"
+              className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-5 py-3 rounded-xl text-sm transition-colors"
+            >
+              + Nouveau service
+            </Link>
+          </div>
         </div>
 
         <ServiceList services={services} />

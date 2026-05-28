@@ -2,7 +2,8 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
-import type { ActionState } from './lib/types'
+import type { ActionState, CaisseWithCalc } from './lib/types'
+import { computeAll } from './lib/formulas'
 
 // Colonnes valides de scd_caisse — filtre les champs fantômes de localStorage
 const VALID_CAISSE_COLUMNS = new Set([
@@ -92,6 +93,50 @@ export async function deleteCaisse(id: string): Promise<ActionState> {
   if (error) return { error: error.message }
   revalidatePath('/projects/scoubidoo-caisse')
   return { success: 'Service supprimé.' }
+}
+
+function csvCell(v: string | number | null | undefined): string {
+  if (v == null) return ''
+  const s = String(v)
+  return s.includes(',') || s.includes('"') || s.includes('\n') ? `"${s.replace(/"/g, '""')}"` : s
+}
+
+export async function exportCaisseCSV(): Promise<{ csv?: string; error?: string }> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Non authentifié.' }
+
+  const { data, error } = await supabase
+    .from('scd_v_caisse_calc')
+    .select('*')
+    .order('date', { ascending: true })
+
+  if (error) return { error: error.message }
+  const rows = (data ?? []) as CaisseWithCalc[]
+
+  const headers = [
+    'Date', 'Tag', 'Commentaires',
+    'Full CA', 'Encaissement CB net', 'CA Cash',
+    'Poire', 'Total HT', 'Total TTC',
+  ]
+
+  const lines = rows.map((row) => {
+    const calc = computeAll(row)
+    return [
+      csvCell(row.date),
+      csvCell(row.tag_name),
+      csvCell(row.notes),
+      csvCell(calc.full_ca),
+      csvCell(calc.encaissement_cb_net),
+      csvCell(calc.ca_cash),
+      csvCell(row.poire),
+      csvCell(row.total_service_ht),
+      csvCell(row.total_service_ttc),
+    ].join(';')
+  })
+
+  const csv = [headers.join(';'), ...lines].join('\n')
+  return { csv }
 }
 
 type SPTransaction = {
