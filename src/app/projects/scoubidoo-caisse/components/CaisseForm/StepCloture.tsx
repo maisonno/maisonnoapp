@@ -22,6 +22,7 @@ function SummaryRow({ label, value, highlight }: { label: string; value: number;
 
 export default function StepCloture({ form, calc }: Omit<Props, 'setNum'> & { setNum?: Props['setNum'] }) {
   const fond = form.fond_caisse_soir ?? 0
+  const ttcOk = form.total_service_ttc != null
 
   return (
     <div className="space-y-5">
@@ -30,9 +31,16 @@ export default function StepCloture({ form, calc }: Omit<Props, 'setNum'> & { se
       {/* Full CA en gros */}
       <div className="pt-2 text-center">
         <div className="text-slate-400 text-sm">CA total</div>
-        <div className="text-4xl font-bold mt-1 text-blue-400">
-          {calc.full_ca.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })}
-        </div>
+        {ttcOk ? (
+          <div className="text-4xl font-bold mt-1 text-blue-400">
+            {calc.full_ca.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })}
+          </div>
+        ) : (
+          <div className="mt-2">
+            <div className="text-2xl font-bold text-slate-500">—</div>
+            <div className="text-xs text-amber-400 mt-1">Saisir le TTC dans l&apos;onglet 6 pour afficher le CA total</div>
+          </div>
+        )}
       </div>
 
       {/* Récap */}
