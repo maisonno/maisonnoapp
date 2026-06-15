@@ -1,5 +1,6 @@
 'use client'
 
+import { useEffect } from 'react'
 import type { CaisseFields } from '../../lib/types'
 import { computeAll } from '../../lib/formulas'
 
@@ -80,6 +81,18 @@ export default function StepRepartition({ form, setNum, setInt, calc }: Props) {
     ) / 100
     setNum('fond_caisse_soir', String(total))
   }
+
+  // Pre-fill fond coupures from espèces on first open (if no fond value set yet)
+  useEffect(() => {
+    const anyFondSet = DENOMS.some(d => ((form[d.fondKey] as number) ?? 0) > 0)
+    if (anyFondSet) return
+    DENOMS.forEach(d => setInt(String(d.fondKey), (form[d.caisseKey] as number) ?? 0))
+    const total = Math.round(
+      DENOMS.reduce((acc, d) => acc + ((form[d.caisseKey] as number) ?? 0) * d.val, 0) * 100
+    ) / 100
+    setNum('fond_caisse_soir', String(total))
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const fondTotal = Math.round(
     DENOMS.reduce((acc, d) => acc + ((form[d.fondKey] as number) ?? 0) * d.val, 0) * 100

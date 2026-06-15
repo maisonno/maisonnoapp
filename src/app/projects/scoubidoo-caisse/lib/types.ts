@@ -121,4 +121,5 @@ export type VeilleData = {
   payplus_jplus1: number | null
   autre_cb_jplus1_pourboire_incl: number | null
   autre_pourboire_jplus1: number | null
+  fond_caisse_soir: number | null
 }

@@ -35,7 +35,7 @@ export async function getVeilleData(today: string): Promise<VeilleData | null> {
   const supabase = await createClient()
   const { data } = await supabase
     .from('scd_caisse')
-    .select('sp_cb_jplus1_pourboire_incl, sp_pourboire_jplus1, payplus_jplus1, autre_cb_jplus1_pourboire_incl, autre_pourboire_jplus1')
+    .select('sp_cb_jplus1_pourboire_incl, sp_pourboire_jplus1, payplus_jplus1, autre_cb_jplus1_pourboire_incl, autre_pourboire_jplus1, fond_caisse_soir')
     .lt('date', today)
     .order('date', { ascending: false })
     .limit(1)

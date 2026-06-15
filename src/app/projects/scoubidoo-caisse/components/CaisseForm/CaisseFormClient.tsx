@@ -52,7 +52,7 @@ function buildInitial(initialData: Caisse | null, veille: VeilleData | null, def
     billets_500: 0, billets_200: 0, billets_100: 0, billets_50: 0,
     billets_20: 0, billets_10: 0, billets_5: 0,
     pieces_2: 0, pieces_1: 0, pieces_50c: 0, pieces_20c: 0, pieces_10c: 0,
-    fond_caisse_matin: 0,
+    fond_caisse_matin: veille?.fond_caisse_soir ?? 0,
     sp_cb_jplus1_veille_pourboire_incl: veille?.sp_cb_jplus1_pourboire_incl ?? null,
     sp_pourboire_jplus1_de_la_veille: veille?.sp_pourboire_jplus1 ?? null,
     payplus_jplus1_de_la_veille: veille?.payplus_jplus1 ?? null,
