@@ -1,0 +1,771 @@
+/* Design « La Pomme d'Adam » — port fidèle du HTML de référence.
+   Scopé sous .ana-scope pour ne pas toucher au thème sombre global de maisonnoApp. */
+
+.ana-scope {
+  --paper: #fbf8f3;
+  --paper-2: #f3eee4;
+  --ink: #1a2238;
+  --ink-soft: #5a6076;
+  --line: #e4dccb;
+  --line-2: #d8cfbc;
+  --resto: #c8443b;
+  --bar: #1e6fa8;
+  --dessert: #d99a28;
+  --entree: #4e8c6a;
+  --plat: #c8443b;
+  --bois: #1e6fa8;
+  --dess: #d99a28;
+  --autre: #9a8f7c;
+  --poire: #7a9a3c;
+  --white: #fffefb;
+  --shadow: 0 1px 2px rgba(26, 34, 56, 0.05), 0 8px 24px rgba(26, 34, 56, 0.06);
+
+  font-family: var(--font-inter), 'Inter', system-ui, sans-serif;
+  background: var(--paper);
+  color: var(--ink);
+  line-height: 1.45;
+  font-feature-settings: 'tnum' 1, 'cv05' 1;
+  min-height: 100vh;
+  padding: 0 0 80px;
+}
+
+.ana-scope * {
+  box-sizing: border-box;
+}
+
+.ana-scope .wrap {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 0 24px;
+}
+
+.ana-scope header {
+  padding: 28px 0 0;
+}
+.ana-scope .eyebrow {
+  font-size: 12px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  font-weight: 600;
+}
+.ana-scope .topnav {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  margin-bottom: 14px;
+}
+.ana-scope .topnav a {
+  color: var(--ink-soft);
+  text-decoration: none;
+}
+.ana-scope .topnav a:hover {
+  color: var(--ink);
+}
+.ana-scope .topnav .sep {
+  color: var(--line-2);
+}
+.ana-scope h1 {
+  font-family: var(--font-bricolage), 'Bricolage Grotesque', sans-serif;
+  font-weight: 800;
+  font-size: clamp(28px, 4.2vw, 44px);
+  line-height: 1.02;
+  letter-spacing: -0.02em;
+  margin: 6px 0 0;
+}
+.ana-scope h1 .blue {
+  color: var(--bar);
+}
+.ana-scope .sub {
+  color: var(--ink-soft);
+  font-size: 15px;
+  margin-top: 10px;
+  max-width: 640px;
+}
+.ana-scope .triline {
+  height: 5px;
+  display: flex;
+  margin: 22px 0 0;
+  border-radius: 3px;
+  overflow: hidden;
+}
+.ana-scope .triline span {
+  flex: 1;
+}
+.ana-scope .triline .a {
+  background: var(--resto);
+}
+.ana-scope .triline .b {
+  background: var(--dessert);
+}
+.ana-scope .triline .c {
+  background: var(--bar);
+}
+
+/* Import drop zone */
+.ana-scope .drop {
+  margin-top: 26px;
+  border: 1.5px dashed var(--line-2);
+  border-radius: 16px;
+  background: var(--white);
+  padding: 26px;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  cursor: pointer;
+  transition: 0.18s;
+  box-shadow: var(--shadow);
+}
+.ana-scope .drop:hover,
+.ana-scope .drop.over {
+  border-color: var(--bar);
+  background: #fff;
+}
+.ana-scope .drop .ic {
+  width: 46px;
+  height: 46px;
+  flex: none;
+  border-radius: 12px;
+  background: var(--paper-2);
+  display: grid;
+  place-items: center;
+  font-size: 22px;
+}
+.ana-scope .drop .txt b {
+  font-family: var(--font-bricolage), 'Bricolage Grotesque', sans-serif;
+  font-weight: 600;
+  font-size: 16px;
+  display: block;
+}
+.ana-scope .drop .txt small {
+  color: var(--ink-soft);
+  font-size: 13px;
+}
+.ana-scope .drop.loaded {
+  border-style: solid;
+  border-color: var(--entree);
+}
+.ana-scope .filelist {
+  margin-top: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.ana-scope .chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12.5px;
+  background: var(--white);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 5px 12px 5px 8px;
+}
+.ana-scope .chip .b {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 2px 7px;
+  border-radius: 999px;
+  color: #fff;
+}
+.ana-scope .chip .b.ventes {
+  background: var(--bar);
+}
+.ana-scope .chip .b.poire {
+  background: var(--poire);
+}
+.ana-scope .chip .b.error {
+  background: var(--resto);
+}
+.ana-scope .chip small {
+  color: var(--ink-soft);
+}
+
+/* Progress bar */
+.ana-scope .progress {
+  margin-top: 16px;
+  height: 10px;
+  background: var(--paper-2);
+  border-radius: 6px;
+  overflow: hidden;
+}
+.ana-scope .progress i {
+  display: block;
+  height: 100%;
+  background: var(--bar);
+  border-radius: 6px;
+  transition: width 0.25s ease;
+}
+.ana-scope .progress-label {
+  font-size: 12.5px;
+  color: var(--ink-soft);
+  margin-top: 8px;
+}
+
+/* Controls bar */
+.ana-scope .controls {
+  margin-top: 18px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px 22px;
+  align-items: flex-end;
+  background: var(--white);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 16px 18px;
+  box-shadow: var(--shadow);
+}
+.ana-scope .field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.ana-scope .field label {
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  font-weight: 600;
+}
+.ana-scope .field input,
+.ana-scope .field select {
+  font-family: inherit;
+  font-size: 14px;
+  color: var(--ink);
+  background: var(--paper);
+  border: 1px solid var(--line-2);
+  border-radius: 9px;
+  padding: 8px 10px;
+  outline: none;
+}
+.ana-scope .field input:focus,
+.ana-scope .field select:focus {
+  border-color: var(--bar);
+}
+.ana-scope .seg {
+  display: flex;
+  border: 1px solid var(--line-2);
+  border-radius: 9px;
+  overflow: hidden;
+}
+.ana-scope .seg button {
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 8px 14px;
+  border: none;
+  background: var(--paper);
+  color: var(--ink-soft);
+  cursor: pointer;
+}
+.ana-scope .seg button.act {
+  background: var(--ink);
+  color: var(--white);
+}
+.ana-scope .check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  user-select: none;
+  padding-bottom: 8px;
+}
+.ana-scope .check input {
+  width: 17px;
+  height: 17px;
+  accent-color: var(--poire);
+  cursor: pointer;
+}
+.ana-scope .ghost {
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--bar);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 8px 0;
+}
+.ana-scope .ghost:hover {
+  text-decoration: underline;
+}
+.ana-scope .range-note {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--ink-soft);
+  align-self: center;
+}
+.ana-scope .poire-wrap {
+  display: flex;
+  flex-direction: row;
+  gap: 18px;
+  align-items: flex-end;
+}
+
+/* Sections */
+.ana-scope section {
+  margin-top: 34px;
+}
+.ana-scope .h2 {
+  font-family: var(--font-bricolage), 'Bricolage Grotesque', sans-serif;
+  font-weight: 600;
+  font-size: 13px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.ana-scope .h2::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--line);
+}
+.ana-scope .h2 .tag {
+  font-size: 11px;
+  letter-spacing: 0.02em;
+  text-transform: none;
+  color: var(--ink);
+  background: var(--paper-2);
+  border-radius: 999px;
+  padding: 3px 10px;
+  font-weight: 600;
+}
+
+/* Matrix (3 cartes) */
+.ana-scope .matrix {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+}
+.ana-scope .tcard {
+  background: var(--white);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 18px 18px 16px;
+  box-shadow: var(--shadow);
+  border-top: 3px solid var(--c);
+}
+.ana-scope .tcard.resto {
+  --c: var(--resto);
+}
+.ana-scope .tcard.dessert {
+  --c: var(--dessert);
+}
+.ana-scope .tcard.bar {
+  --c: var(--bar);
+}
+.ana-scope .tcard .name {
+  font-family: var(--font-bricolage), 'Bricolage Grotesque', sans-serif;
+  font-weight: 600;
+  font-size: 15px;
+}
+.ana-scope .tcard .desc {
+  font-size: 11.5px;
+  color: var(--ink-soft);
+  margin-top: 2px;
+  min-height: 28px;
+}
+.ana-scope .tcard .big {
+  font-family: var(--font-bricolage), 'Bricolage Grotesque', sans-serif;
+  font-weight: 800;
+  font-size: 30px;
+  letter-spacing: -0.02em;
+  margin-top: 8px;
+}
+.ana-scope .tcard .poireline {
+  font-size: 12px;
+  color: var(--poire);
+  font-weight: 600;
+  margin-top: 3px;
+}
+.ana-scope .splitrow {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+.ana-scope .splitrow .s {
+  flex: 1;
+  background: var(--paper);
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+.ana-scope .splitrow .s .l {
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--ink-soft);
+  font-weight: 600;
+}
+.ana-scope .splitrow .s .v {
+  font-weight: 700;
+  font-size: 15px;
+  margin-top: 1px;
+}
+.ana-scope .splitrow .s .t {
+  font-size: 11px;
+  color: var(--ink-soft);
+}
+
+/* KPIs */
+.ana-scope .kpis {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 12px;
+}
+.ana-scope .kpi {
+  background: var(--white);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 15px 14px;
+  box-shadow: var(--shadow);
+}
+.ana-scope .kpi .l {
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--ink-soft);
+  font-weight: 600;
+}
+.ana-scope .kpi .v {
+  font-family: var(--font-bricolage), 'Bricolage Grotesque', sans-serif;
+  font-weight: 800;
+  font-size: 25px;
+  letter-spacing: -0.02em;
+  margin-top: 6px;
+}
+.ana-scope .kpi .v small {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink-soft);
+  letter-spacing: 0;
+}
+.ana-scope .kpi .sub {
+  font-size: 11px;
+  color: var(--ink-soft);
+  margin-top: 4px;
+}
+
+/* 2 colonnes */
+.ana-scope .cols {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+.ana-scope .box {
+  background: var(--white);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 18px;
+  box-shadow: var(--shadow);
+}
+.ana-scope .box h3 {
+  font-family: var(--font-bricolage), 'Bricolage Grotesque', sans-serif;
+  font-weight: 600;
+  font-size: 14px;
+  margin-bottom: 14px;
+}
+
+/* Tableau service */
+.ana-scope table.svc {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.ana-scope table.svc th,
+.ana-scope table.svc td {
+  text-align: right;
+  padding: 7px 6px;
+  border-bottom: 1px solid var(--line);
+}
+.ana-scope table.svc th:first-child,
+.ana-scope table.svc td:first-child {
+  text-align: left;
+}
+.ana-scope table.svc thead th {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--ink-soft);
+  font-weight: 600;
+}
+.ana-scope table.svc tbody tr:last-child td {
+  border-bottom: none;
+}
+.ana-scope table.svc .tot td {
+  font-weight: 700;
+  border-top: 1.5px solid var(--line-2);
+}
+
+/* Répartition */
+.ana-scope .rep {
+  display: flex;
+  flex-direction: column;
+  gap: 13px;
+}
+.ana-scope .repbar .top {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12.5px;
+  margin-bottom: 5px;
+}
+.ana-scope .repbar .top .n {
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.ana-scope .repbar .top .n i {
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+  display: inline-block;
+}
+.ana-scope .repbar .track {
+  height: 9px;
+  background: var(--paper-2);
+  border-radius: 5px;
+  overflow: hidden;
+}
+.ana-scope .repbar .fill {
+  height: 100%;
+  border-radius: 5px;
+  transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.ana-scope .repbar .pct {
+  font-weight: 700;
+}
+
+/* Comparaison annuelle */
+.ana-scope .cmp {
+  background: var(--white);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+.ana-scope .cmp .note {
+  font-size: 12px;
+  color: var(--ink-soft);
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--line);
+  background: var(--paper-2);
+}
+.ana-scope table.cmp-t {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.ana-scope table.cmp-t th,
+.ana-scope table.cmp-t td {
+  padding: 11px 14px;
+  text-align: right;
+  border-bottom: 1px solid var(--line);
+  white-space: nowrap;
+}
+.ana-scope table.cmp-t th:first-child,
+.ana-scope table.cmp-t td:first-child {
+  text-align: left;
+}
+.ana-scope table.cmp-t thead th {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ink-soft);
+  font-weight: 600;
+}
+.ana-scope table.cmp-t tbody tr:last-child td {
+  border-bottom: none;
+}
+.ana-scope table.cmp-t .yr {
+  font-family: var(--font-bricolage), 'Bricolage Grotesque', sans-serif;
+  font-weight: 700;
+  font-size: 15px;
+}
+.ana-scope table.cmp-t tr.cur {
+  background: #fbf6ec;
+}
+.ana-scope table.cmp-t tr.cur .yr {
+  color: var(--resto);
+}
+.ana-scope .evo {
+  font-weight: 700;
+  font-size: 12px;
+}
+.ana-scope .evo.up {
+  color: #2e7d52;
+}
+.ana-scope .evo.down {
+  color: #c0392b;
+}
+.ana-scope .cabar {
+  height: 7px;
+  background: var(--paper-2);
+  border-radius: 4px;
+  margin-top: 6px;
+  overflow: hidden;
+  min-width: 90px;
+}
+.ana-scope .cabar i {
+  display: block;
+  height: 100%;
+  background: var(--bar);
+  border-radius: 4px;
+}
+.ana-scope .partial {
+  font-size: 11px;
+  color: #b26b00;
+  font-weight: 600;
+}
+
+/* Jour par jour */
+.ana-scope .daily {
+  overflow-x: auto;
+  background: var(--white);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  box-shadow: var(--shadow);
+}
+.ana-scope table.day {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  min-width: 620px;
+}
+.ana-scope table.day th,
+.ana-scope table.day td {
+  padding: 9px 12px;
+  text-align: right;
+  border-bottom: 1px solid var(--line);
+  white-space: nowrap;
+}
+.ana-scope table.day th:first-child,
+.ana-scope table.day td:first-child {
+  text-align: left;
+}
+.ana-scope table.day thead th {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--ink-soft);
+  font-weight: 600;
+  position: sticky;
+  top: 0;
+  background: var(--white);
+}
+.ana-scope table.day tbody tr:hover {
+  background: var(--paper);
+}
+.ana-scope table.day .tot td {
+  font-weight: 700;
+  border-top: 1.5px solid var(--line-2);
+  background: var(--paper-2);
+}
+.ana-scope table.day td.poire {
+  color: var(--poire);
+  font-weight: 600;
+}
+
+/* Footer + erreurs */
+.ana-scope .foot {
+  margin-top: 30px;
+  font-size: 12px;
+  color: var(--ink-soft);
+  line-height: 1.6;
+  border-top: 1px solid var(--line);
+  padding-top: 16px;
+}
+.ana-scope .err {
+  margin-top: 14px;
+  background: #fdecea;
+  border: 1px solid #f3c0ba;
+  color: #9a2b22;
+  padding: 12px 16px;
+  border-radius: 12px;
+  font-size: 14px;
+}
+.ana-scope .ok {
+  margin-top: 14px;
+  background: #eef7ef;
+  border: 1px solid #bfe0c4;
+  color: #226b35;
+  padding: 12px 16px;
+  border-radius: 12px;
+  font-size: 14px;
+}
+
+/* Boutons / liens d'action */
+.ana-scope .btn {
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  padding: 10px 18px;
+  border-radius: 10px;
+  border: none;
+  cursor: pointer;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.ana-scope .btn-primary {
+  background: var(--bar);
+  color: #fff;
+}
+.ana-scope .btn-primary:hover {
+  background: #195d8c;
+}
+.ana-scope .btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.ana-scope .btn-ghost {
+  background: var(--white);
+  color: var(--ink);
+  border: 1px solid var(--line-2);
+}
+.ana-scope .btn-ghost:hover {
+  border-color: var(--bar);
+}
+
+.ana-scope .empty {
+  background: var(--white);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  box-shadow: var(--shadow);
+  padding: 40px;
+  text-align: center;
+  color: var(--ink-soft);
+  margin-top: 26px;
+}
+
+.ana-scope .toolbar {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-top: 18px;
+}
+
+@media (max-width: 860px) {
+  .ana-scope .matrix {
+    grid-template-columns: 1fr;
+  }
+  .ana-scope .kpis {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .ana-scope .cols {
+    grid-template-columns: 1fr;
+  }
+  .ana-scope .range-note {
+    margin-left: 0;
+    width: 100%;
+  }
+}
