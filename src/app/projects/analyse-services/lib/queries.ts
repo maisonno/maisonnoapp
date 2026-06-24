@@ -20,7 +20,10 @@ export async function getAllTicketMetrics(): Promise<TicketMetric[]> {
       .select(METRIC_COLS)
       .order('jour', { ascending: true })
       .range(from, from + PAGE - 1)
-    if (error) throw new Error(error.message)
+    if (error) {
+      console.error('[ana] getAllTicketMetrics error:', error.code, error.message)
+      break
+    }
     if (!data || data.length === 0) break
     all.push(...(data as unknown as TicketMetric[]))
     if (data.length < PAGE) break
@@ -37,7 +40,10 @@ export async function getAllPoire(): Promise<PoireDay[]> {
       .select('jour,montant_ttc')
       .order('jour', { ascending: true })
       .range(from, from + PAGE - 1)
-    if (error) throw new Error(error.message)
+    if (error) {
+      console.error('[ana] getAllPoire error:', error.code, error.message)
+      break
+    }
     if (!data || data.length === 0) break
     all.push(...(data as unknown as PoireDay[]))
     if (data.length < PAGE) break
