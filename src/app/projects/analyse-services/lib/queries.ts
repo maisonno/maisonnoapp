@@ -69,6 +69,9 @@ export async function getImportLog(limit = 20): Promise<ImportLogEntry[]> {
     .select('*')
     .order('created_at', { ascending: false })
     .limit(limit)
-  if (error) throw new Error(error.message)
+  if (error) {
+    console.error('[ana] getImportLog error:', error.code, error.message)
+    return []
+  }
   return (data as ImportLogEntry[]) ?? []
 }
