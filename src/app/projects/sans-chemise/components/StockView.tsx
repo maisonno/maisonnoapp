@@ -42,18 +42,40 @@ export default function StockView({ articles, mouvements }: Props) {
     router.refresh()
   }
 
+  // Recherche + filtre par variante
+  const [search, setSearch] = useState('')
+  const [variFilter, setVariFilter] = useState('all')
+
+  // Variantes présentes (pour le filtre)
+  const variantes = useMemo(
+    () => Array.from(new Set(articles.map((a) => a.variante))).sort((a, b) => a.localeCompare(b, 'fr')),
+    [articles],
+  )
+
+  const norm = (s: string) => s.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase()
+
+  const filtered = useMemo(() => {
+    const q = norm(search.trim())
+    return articles.filter((a) => {
+      if (variFilter !== 'all' && a.variante !== variFilter) return false
+      if (!q) return true
+      return norm(`${a.modele_nom} ${a.variante} ${a.taille}`).includes(q)
+    })
+  }, [articles, search, variFilter])
+
   // Regroupe par modèle
   const groups = useMemo(() => {
     const map = new Map<string, ArticleRow[]>()
-    for (const a of articles) {
+    for (const a of filtered) {
       const list = map.get(a.modele_nom) ?? []
       list.push(a)
       map.set(a.modele_nom, list)
     }
     return Array.from(map.entries())
-  }, [articles])
+  }, [filtered])
 
-  const stockTotal = articles.reduce((s, a) => s + stockOf(a), 0)
+  const stockTotal = filtered.reduce((s, a) => s + stockOf(a), 0)
+  const filtering = search.trim() !== '' || variFilter !== 'all'
 
   if (articles.length === 0) {
     return (
@@ -66,8 +88,31 @@ export default function StockView({ articles, mouvements }: Props) {
   return (
     <div className="space-y-4">
       <div className="bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 flex items-center justify-between">
-        <span className="text-sm text-slate-400">Stock total</span>
+        <span className="text-sm text-slate-400">{filtering ? 'Stock filtré' : 'Stock total'}</span>
         <span className="text-xl font-bold text-slate-100">{stockTotal}</span>
+      </div>
+
+      {/* Recherche + filtre par variante */}
+      <div className="flex gap-2">
+        <div className="relative flex-1">
+          <input
+            type="search"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Rechercher un modèle, une taille…"
+            className="input w-full pl-9"
+          />
+          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm">⌕</span>
+        </div>
+        <select
+          value={variFilter}
+          onChange={(e) => setVariFilter(e.target.value)}
+          className="input w-auto shrink-0"
+          aria-label="Filtrer par variante"
+        >
+          <option value="all">Toutes variantes</option>
+          {variantes.map((v) => <option key={v} value={v}>{v}</option>)}
+        </select>
       </div>
 
       <p className="text-xs text-slate-500">
@@ -75,6 +120,10 @@ export default function StockView({ articles, mouvements }: Props) {
         <span className="text-red-400 font-semibold">−</span> pour ajuster d’une unité, ou le nom de
         l’article pour une réception/retrait en quantité.
       </p>
+
+      {groups.length === 0 && (
+        <p className="text-center text-slate-500 py-8">Aucun article ne correspond.</p>
+      )}
 
       {groups.map(([nom, rows]) => (
         <div key={nom} className="space-y-1.5">
