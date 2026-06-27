@@ -25,7 +25,7 @@ export async function getModelesWithStock(): Promise<ModeleWithArticles[]> {
 
   const [modelesRes, articlesRes, stockRes] = await Promise.all([
     supabase.from('snc_modeles').select('id, nom, prix, variantes, tailles, actif').eq('actif', true).order('nom'),
-    supabase.from('snc_articles').select('id, modele_id, variante, taille, actif').eq('actif', true),
+    supabase.from('snc_articles').select('id, modele_id, variante, taille, actif, prix').eq('actif', true),
     supabase.from('snc_v_stock').select('article_id, stock'),
   ])
 
@@ -42,6 +42,7 @@ export async function getModelesWithStock(): Promise<ModeleWithArticles[]> {
       taille: a.taille,
       actif: a.actif,
       stock: stockMap.get(a.id) ?? 0,
+      prix: a.prix != null ? Number(a.prix) : null,
     })
     articlesByModele.set(a.modele_id, list)
   }
@@ -69,7 +70,7 @@ export async function getModelesWithStock(): Promise<ModeleWithArticles[]> {
 export async function getArticlesWithStock(): Promise<(Article & { modele_nom: string })[]> {
   const supabase = await createClient()
   const [articlesRes, modelesRes, stockRes] = await Promise.all([
-    supabase.from('snc_articles').select('id, modele_id, variante, taille, actif').eq('actif', true),
+    supabase.from('snc_articles').select('id, modele_id, variante, taille, actif, prix').eq('actif', true),
     supabase.from('snc_modeles').select('id, nom, variantes').eq('actif', true),
     supabase.from('snc_v_stock').select('article_id, stock'),
   ])
@@ -89,6 +90,7 @@ export async function getArticlesWithStock(): Promise<(Article & { modele_nom: s
       taille: a.taille,
       actif: a.actif,
       stock: stockMap.get(a.id) ?? 0,
+      prix: a.prix != null ? Number(a.prix) : null,
       modele_nom: modeleMap.get(a.modele_id)!.nom,
     }))
     .sort((a, b) => {

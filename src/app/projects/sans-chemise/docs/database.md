@@ -29,8 +29,13 @@ Générée automatiquement depuis le modèle.
 | modele_id | uuid FK → snc_modeles | `on delete cascade` |
 | variante | text | |
 | taille | text | |
+| prix | numeric NULL | prix propre à l'article (par variante) ; `NULL` → repli sur `snc_modeles.prix` |
 | actif | boolean | désactivé quand la combinaison est retirée du modèle |
 | | | `unique (modele_id, variante, taille)` |
+
+> Le prix appliqué à la vente est pré-rempli avec `article.prix ?? modele.prix`
+> (puis modifiable). Cf. migration `0015_sans-chemise-prix.sql` pour la
+> tarification par variante.
 
 ### `snc_ventes`
 Une ligne = une vente d'un article.
