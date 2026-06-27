@@ -9,16 +9,18 @@ export default async function UserManagementPage() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  // Seuls les admins peuvent accéder à cette page
-  const { data: currentProfile } = await supabase
+  const admin = createAdminClient()
+
+  // Seuls les admins peuvent accéder à cette page.
+  // On lit le rôle via le client admin (service role) pour ne pas dépendre
+  // des politiques RLS de usr_profiles.
+  const { data: currentProfile } = await admin
     .from('usr_profiles')
     .select('role')
     .eq('id', user.id)
     .single()
 
   if (currentProfile?.role !== 'admin') redirect('/')
-
-  const admin = createAdminClient()
 
   // Tous les utilisateurs auth + leurs profils
   const [{ data: { users: authUsers } }, { data: profiles }, { data: projects }] =
