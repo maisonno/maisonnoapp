@@ -1,9 +1,9 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import type { Modele } from '../lib/types'
-import { deleteModele, setModeleActif } from '../actions'
+import { deleteModele, setModeleActif, setVariantePhare } from '../actions'
 import ModeleFormModal from './ModeleFormModal'
 
 type Props = {
@@ -15,6 +15,23 @@ export default function ModelesView({ modeles }: Props) {
   const [showForm, setShowForm] = useState(false)
   const [editing, setEditing] = useState<Modele | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
+  // Surcouche optimiste des phares pendant l'enregistrement : "modeleId|variante" -> bool
+  const [phares, setPhares] = useState<Record<string, boolean>>({})
+  useEffect(() => { setPhares({}) }, [modeles])
+
+  const isPhare = (m: Modele, v: string) => phares[`${m.id}|${v}`] ?? m.variantesPhares.includes(v)
+
+  const togglePhare = async (m: Modele, v: string) => {
+    const next = !isPhare(m, v)
+    setPhares((p) => ({ ...p, [`${m.id}|${v}`]: next }))
+    const res = await setVariantePhare(m.id, v, next)
+    if (res.error) {
+      setPhares((p) => ({ ...p, [`${m.id}|${v}`]: !next }))
+      alert(res.error)
+      return
+    }
+    router.refresh()
+  }
 
   const handleToggle = async (m: Modele) => {
     setBusy(m.id)
@@ -56,15 +73,28 @@ export default function ModelesView({ modeles }: Props) {
                     {m.nom}
                     {!m.actif && <span className="ml-2 text-xs text-slate-500">(inactif)</span>}
                   </div>
-                  <div className="flex flex-wrap gap-x-2 gap-y-0.5 mt-1">
-                    {m.variantes.map((v) => (
-                      <span key={v} className="text-xs text-slate-400">
-                        {v}{' '}
-                        <span className="text-blue-400 font-medium">
-                          {(m.prixVariantes[v] ?? m.prix).toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })}
-                        </span>
-                      </span>
-                    ))}
+                  <div className="flex flex-wrap gap-1.5 mt-1.5">
+                    {m.variantes.map((v) => {
+                      const star = isPhare(m, v)
+                      return (
+                        <button
+                          key={v}
+                          onClick={() => togglePhare(m, v)}
+                          title={star ? 'Retirer des phares' : 'Marquer comme phare'}
+                          className={`inline-flex items-center gap-1 text-xs rounded-full pl-1.5 pr-2 py-0.5 border transition-colors ${
+                            star
+                              ? 'border-amber-500/50 bg-amber-500/10 text-amber-300'
+                              : 'border-slate-700 bg-slate-800/60 text-slate-400 hover:border-slate-600'
+                          }`}
+                        >
+                          <span className={star ? 'text-amber-400' : 'text-slate-600'}>{star ? '★' : '☆'}</span>
+                          {v}{' '}
+                          <span className={star ? 'text-amber-200/90 font-medium' : 'text-blue-400 font-medium'}>
+                            {(m.prixVariantes[v] ?? m.prix).toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })}
+                          </span>
+                        </button>
+                      )
+                    })}
                   </div>
                   <div className="text-xs text-slate-600 mt-1">Tailles : {m.tailles.join(', ')}</div>
                 </div>

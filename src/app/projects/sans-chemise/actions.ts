@@ -53,11 +53,13 @@ type ModeleInput = {
   tailles: string[]
   // Prix par variante (€)
   prixVariantes: Record<string, number>
+  // Variantes « phares »
+  variantesPhares: string[]
 }
 
 function parseModele(
   data: ModeleInput,
-): { error?: string; nom?: string; prix?: number; prixVariantes?: Record<string, number> } {
+): { error?: string; nom?: string; prix?: number; prixVariantes?: Record<string, number>; variantesPhares?: string[] } {
   const nom = data.nom.trim()
   if (!nom) return { error: 'Le nom est requis' }
   if (data.variantes.length === 0) return { error: 'Sélectionne au moins une variante' }
@@ -72,7 +74,9 @@ function parseModele(
   }
   // Prix de base = prix le plus bas (sert de repli / d'affichage)
   const prix = Math.min(...Object.values(prixVariantes))
-  return { nom, prix, prixVariantes }
+  // Phares limitées aux variantes sélectionnées
+  const variantesPhares = (data.variantesPhares ?? []).filter((v) => data.variantes.includes(v))
+  return { nom, prix, prixVariantes, variantesPhares }
 }
 
 export async function createModele(data: ModeleInput): Promise<ActionState> {
@@ -89,6 +93,7 @@ export async function createModele(data: ModeleInput): Promise<ActionState> {
       nom: parsed.nom,
       prix: parsed.prix,
       prix_variantes: parsed.prixVariantes,
+      variantes_phares: parsed.variantesPhares,
       variantes: data.variantes,
       tailles: data.tailles,
     })
@@ -115,6 +120,7 @@ export async function updateModele(id: string, data: ModeleInput): Promise<Actio
       nom: parsed.nom,
       prix: parsed.prix,
       prix_variantes: parsed.prixVariantes,
+      variantes_phares: parsed.variantesPhares,
       variantes: data.variantes,
       tailles: data.tailles,
     })
@@ -123,6 +129,28 @@ export async function updateModele(id: string, data: ModeleInput): Promise<Actio
   if (error) return { error: error.message }
 
   await syncArticles(supabase, id, data.variantes, data.tailles)
+  return { success: true }
+}
+
+// Marque/démarque une variante d'un modèle comme « phare » (action rapide)
+export async function setVariantePhare(id: string, variante: string, phare: boolean): Promise<ActionState> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Non authentifié' }
+
+  const { data: modele } = await supabase
+    .from('snc_modeles')
+    .select('variantes_phares')
+    .eq('id', id)
+    .single()
+
+  const current: string[] = modele?.variantes_phares ?? []
+  const next = phare
+    ? Array.from(new Set([...current, variante]))
+    : current.filter((v) => v !== variante)
+
+  const { error } = await supabase.from('snc_modeles').update({ variantes_phares: next }).eq('id', id)
+  if (error) return { error: error.message }
   return { success: true }
 }
 

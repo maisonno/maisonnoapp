@@ -42,9 +42,10 @@ export default function StockView({ articles, mouvements }: Props) {
     router.refresh()
   }
 
-  // Recherche + filtre par variante
+  // Recherche + filtre par variante + filtre phares
   const [search, setSearch] = useState('')
   const [variFilter, setVariFilter] = useState('all')
+  const [onlyPhare, setOnlyPhare] = useState(false)
 
   // Variantes présentes (pour le filtre)
   const variantes = useMemo(
@@ -57,11 +58,12 @@ export default function StockView({ articles, mouvements }: Props) {
   const filtered = useMemo(() => {
     const q = norm(search.trim())
     return articles.filter((a) => {
+      if (onlyPhare && !a.phare) return false
       if (variFilter !== 'all' && a.variante !== variFilter) return false
       if (!q) return true
       return norm(`${a.modele_nom} ${a.variante} ${a.taille}`).includes(q)
     })
-  }, [articles, search, variFilter])
+  }, [articles, search, variFilter, onlyPhare])
 
   // Regroupe par modèle
   const groups = useMemo(() => {
@@ -75,7 +77,7 @@ export default function StockView({ articles, mouvements }: Props) {
   }, [filtered])
 
   const stockTotal = filtered.reduce((s, a) => s + stockOf(a), 0)
-  const filtering = search.trim() !== '' || variFilter !== 'all'
+  const filtering = search.trim() !== '' || variFilter !== 'all' || onlyPhare
 
   if (articles.length === 0) {
     return (
@@ -113,6 +115,18 @@ export default function StockView({ articles, mouvements }: Props) {
           <option value="all">Toutes variantes</option>
           {variantes.map((v) => <option key={v} value={v}>{v}</option>)}
         </select>
+        <button
+          onClick={() => setOnlyPhare((v) => !v)}
+          aria-pressed={onlyPhare}
+          title="N'afficher que les variantes phares"
+          className={`shrink-0 w-11 rounded-lg border text-lg leading-none transition-colors ${
+            onlyPhare
+              ? 'border-amber-500/50 bg-amber-500/15 text-amber-400'
+              : 'border-slate-700 bg-slate-950 text-slate-500 hover:text-slate-300'
+          }`}
+        >
+          {onlyPhare ? '★' : '☆'}
+        </button>
       </div>
 
       <p className="text-xs text-slate-500">

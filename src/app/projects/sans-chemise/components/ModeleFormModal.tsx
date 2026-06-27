@@ -60,7 +60,14 @@ export default function ModeleFormModal({ modele, onClose, onDone }: Props) {
     setError(null)
     const pv: Record<string, number> = {}
     for (const v of variantes) pv[v] = parseFloat(prixVariantes[v] ?? '') || 0
-    const payload = { nom, variantes, tailles: sortTailles(tailles), prixVariantes: pv }
+    const payload = {
+      nom,
+      variantes,
+      tailles: sortTailles(tailles),
+      prixVariantes: pv,
+      // Préserve les variantes phares définies sur l'écran des modèles
+      variantesPhares: modele?.variantesPhares ?? [],
+    }
     const result = isEdit ? await updateModele(modele.id, payload) : await createModele(payload)
     setSaving(false)
     if (result.error) { setError(result.error); return }

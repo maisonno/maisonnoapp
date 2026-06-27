@@ -21,6 +21,17 @@ export default function SaleEntry({ modeles }: Props) {
     setTimeout(() => setToast(null), 1800)
   }
 
+  const hasPhare = (m: ModeleWithArticles) => m.variantesPhares.some((v) => m.variantes.includes(v))
+
+  // Les modèles avec au moins une variante phare passent en premier
+  const sorted = useMemo(
+    () => [...modeles].sort((a, b) => {
+      const d = (hasPhare(a) ? 0 : 1) - (hasPhare(b) ? 0 : 1)
+      return d !== 0 ? d : a.nom.localeCompare(b.nom, 'fr')
+    }),
+    [modeles],
+  )
+
   if (modeles.length === 0) {
     return (
       <p className="text-center text-slate-500 py-12">
@@ -34,21 +45,29 @@ export default function SaleEntry({ modeles }: Props) {
       <p className="text-sm text-slate-400">Touche un modèle pour enregistrer une vente.</p>
 
       <div className="grid grid-cols-2 gap-3">
-        {modeles.map((m) => (
-          <button
-            key={m.id}
-            onClick={() => setSelected(m)}
-            className="text-left bg-slate-900 border border-slate-800 hover:border-blue-600 active:bg-slate-800 rounded-2xl p-4 transition-colors"
-          >
-            <div className="font-semibold text-slate-100 leading-tight">{m.nom}</div>
-            <div className="text-blue-400 text-sm font-medium mt-1">
-              {m.prix.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })}
-            </div>
-            <div className="text-xs text-slate-500 mt-2">
-              Stock : <span className={m.stockTotal <= 0 ? 'text-red-400' : 'text-slate-300'}>{m.stockTotal}</span>
-            </div>
-          </button>
-        ))}
+        {sorted.map((m) => {
+          const phare = hasPhare(m)
+          return (
+            <button
+              key={m.id}
+              onClick={() => setSelected(m)}
+              className={`text-left bg-slate-900 border rounded-2xl p-4 transition-colors active:bg-slate-800 ${
+                phare ? 'border-amber-500/40 hover:border-amber-500' : 'border-slate-800 hover:border-blue-600'
+              }`}
+            >
+              <div className="flex items-start gap-1">
+                {phare && <span className="text-amber-400 text-sm leading-tight shrink-0">★</span>}
+                <span className="font-semibold text-slate-100 leading-tight">{m.nom}</span>
+              </div>
+              <div className="text-blue-400 text-sm font-medium mt-1">
+                {m.prix.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })}
+              </div>
+              <div className="text-xs text-slate-500 mt-2">
+                Stock : <span className={m.stockTotal <= 0 ? 'text-red-400' : 'text-slate-300'}>{m.stockTotal}</span>
+              </div>
+            </button>
+          )
+        })}
       </div>
 
       {selected && (

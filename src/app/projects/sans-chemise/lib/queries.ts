@@ -17,13 +17,14 @@ export async function getModeles(): Promise<Modele[]> {
   const supabase = await createClient()
   const { data } = await supabase
     .from('snc_modeles')
-    .select('id, nom, prix, prix_variantes, variantes, tailles, actif')
+    .select('id, nom, prix, prix_variantes, variantes_phares, variantes, tailles, actif')
     .order('nom')
   return (data ?? []).map((m) => ({
     id: m.id,
     nom: m.nom,
     prix: Number(m.prix),
     prixVariantes: parsePrixVariantes(m.prix_variantes),
+    variantesPhares: m.variantes_phares ?? [],
     variantes: m.variantes ?? [],
     tailles: sortTailles(m.tailles ?? []),
     actif: m.actif,
@@ -36,7 +37,7 @@ export async function getModelesWithStock(): Promise<ModeleWithArticles[]> {
   const supabase = await createClient()
 
   const [modelesRes, articlesRes, stockRes] = await Promise.all([
-    supabase.from('snc_modeles').select('id, nom, prix, prix_variantes, variantes, tailles, actif').eq('actif', true).order('nom'),
+    supabase.from('snc_modeles').select('id, nom, prix, prix_variantes, variantes_phares, variantes, tailles, actif').eq('actif', true).order('nom'),
     supabase.from('snc_articles').select('id, modele_id, variante, taille, actif').eq('actif', true),
     supabase.from('snc_v_stock').select('article_id, stock'),
   ])
@@ -44,19 +45,19 @@ export async function getModelesWithStock(): Promise<ModeleWithArticles[]> {
   const stockMap = new Map<string, number>()
   for (const row of stockRes.data ?? []) stockMap.set(row.article_id, Number(row.stock))
 
-  // Prix de base + prix par variante de chaque modèle (pour dériver le prix d'un article)
-  const priceInfo = new Map<string, { base: number; pv: Record<string, number> }>()
+  // Prix de base + prix par variante + variantes phares de chaque modèle
+  const info = new Map<string, { base: number; pv: Record<string, number>; phares: Set<string> }>()
   for (const m of modelesRes.data ?? []) {
-    priceInfo.set(m.id, { base: Number(m.prix), pv: parsePrixVariantes(m.prix_variantes) })
-  }
-  const priceOf = (modeleId: string, variante: string): number | null => {
-    const info = priceInfo.get(modeleId)
-    if (!info) return null
-    return info.pv[variante] ?? info.base ?? null
+    info.set(m.id, {
+      base: Number(m.prix),
+      pv: parsePrixVariantes(m.prix_variantes),
+      phares: new Set<string>(m.variantes_phares ?? []),
+    })
   }
 
   const articlesByModele = new Map<string, Article[]>()
   for (const a of articlesRes.data ?? []) {
+    const mi = info.get(a.modele_id)
     const list = articlesByModele.get(a.modele_id) ?? []
     list.push({
       id: a.id,
@@ -65,7 +66,8 @@ export async function getModelesWithStock(): Promise<ModeleWithArticles[]> {
       taille: a.taille,
       actif: a.actif,
       stock: stockMap.get(a.id) ?? 0,
-      prix: priceOf(a.modele_id, a.variante),
+      prix: mi ? (mi.pv[a.variante] ?? mi.base ?? null) : null,
+      phare: mi ? mi.phares.has(a.variante) : false,
     })
     articlesByModele.set(a.modele_id, list)
   }
@@ -81,6 +83,7 @@ export async function getModelesWithStock(): Promise<ModeleWithArticles[]> {
       nom: m.nom,
       prix: Number(m.prix),
       prixVariantes: parsePrixVariantes(m.prix_variantes),
+      variantesPhares: m.variantes_phares ?? [],
       variantes: m.variantes ?? [],
       tailles: sortTailles(m.tailles ?? []),
       actif: m.actif,
@@ -95,16 +98,21 @@ export async function getArticlesWithStock(): Promise<(Article & { modele_nom: s
   const supabase = await createClient()
   const [articlesRes, modelesRes, stockRes] = await Promise.all([
     supabase.from('snc_articles').select('id, modele_id, variante, taille, actif').eq('actif', true),
-    supabase.from('snc_modeles').select('id, nom, prix, prix_variantes, variantes').eq('actif', true),
+    supabase.from('snc_modeles').select('id, nom, prix, prix_variantes, variantes_phares, variantes').eq('actif', true),
     supabase.from('snc_v_stock').select('article_id, stock'),
   ])
 
   const stockMap = new Map<string, number>()
   for (const row of stockRes.data ?? []) stockMap.set(row.article_id, Number(row.stock))
 
-  const modeleMap = new Map<string, { nom: string; base: number; pv: Record<string, number> }>()
+  const modeleMap = new Map<string, { nom: string; base: number; pv: Record<string, number>; phares: Set<string> }>()
   for (const m of modelesRes.data ?? []) {
-    modeleMap.set(m.id, { nom: m.nom, base: Number(m.prix), pv: parsePrixVariantes(m.prix_variantes) })
+    modeleMap.set(m.id, {
+      nom: m.nom,
+      base: Number(m.prix),
+      pv: parsePrixVariantes(m.prix_variantes),
+      phares: new Set<string>(m.variantes_phares ?? []),
+    })
   }
 
   return (articlesRes.data ?? [])
@@ -119,6 +127,7 @@ export async function getArticlesWithStock(): Promise<(Article & { modele_nom: s
         actif: a.actif,
         stock: stockMap.get(a.id) ?? 0,
         prix: info.pv[a.variante] ?? info.base ?? null,
+        phare: info.phares.has(a.variante),
         modele_nom: info.nom,
       }
     })

@@ -15,6 +15,7 @@ Un design vendu sous plusieurs déclinaisons.
 | nom | text | nom du modèle |
 | prix | numeric | prix de base (€) = repli ; auto = plus bas des prix de variante |
 | prix_variantes | jsonb | prix par variante, ex. `{"T-Shirt":29,"Sweat":49}` |
+| variantes_phares | text[] | variantes « phares » (mises en avant), ex. `{Sweat}` |
 | variantes | text[] | ex. `{Tshirt homme, Sweat}` |
 | tailles | text[] | ex. `{S, M, L, XL}` |
 | actif | boolean | un modèle inactif n'apparaît plus à la vente |
