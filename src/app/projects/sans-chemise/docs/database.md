@@ -49,6 +49,7 @@ Une ligne = une vente d'un article.
 | article_id | uuid FK → snc_articles | `on delete restrict` |
 | quantite | integer | `> 0` |
 | prix_unitaire | numeric | prix appliqué au moment de la vente |
+| mode_paiement | text NULL | `'cb'` ou `'especes'` (NULL pour les ventes antérieures) |
 | notes | text | optionnel |
 | created_by | uuid | id de l'utilisateur |
 | created_at / updated_at | timestamptz | |

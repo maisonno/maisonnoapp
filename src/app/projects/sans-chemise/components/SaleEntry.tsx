@@ -112,6 +112,7 @@ function SaleSheet({
   const [article, setArticle] = useState<Article | null>(null)
   const [quantite, setQuantite] = useState(1)
   const [prix, setPrix] = useState(String(priceForVariante(variantes[0] ?? '')))
+  const [mode, setMode] = useState<'cb' | 'especes'>('cb')
   const [date, setDate] = useState(today)
   const [showDate, setShowDate] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -137,6 +138,7 @@ function SaleSheet({
       article_id: article.id,
       quantite,
       prix_unitaire: prix,
+      mode_paiement: mode,
       notes: '',
     })
     setSaving(false)
@@ -245,6 +247,31 @@ function SaleSheet({
               />
               <span className="text-slate-400 text-sm">€</span>
             </div>
+          </div>
+        </div>
+
+        {/* Mode de paiement */}
+        <div>
+          <label className="text-xs text-slate-400 block mb-1.5">Paiement</label>
+          <div className="flex gap-3">
+            <button
+              type="button"
+              onClick={() => setMode('cb')}
+              className={`flex-1 py-2.5 rounded-xl font-medium text-sm transition-colors ${
+                mode === 'cb' ? 'bg-blue-600 text-white' : 'bg-slate-800 text-slate-400'
+              }`}
+            >
+              💳 CB
+            </button>
+            <button
+              type="button"
+              onClick={() => setMode('especes')}
+              className={`flex-1 py-2.5 rounded-xl font-medium text-sm transition-colors ${
+                mode === 'especes' ? 'bg-emerald-700 text-white' : 'bg-slate-800 text-slate-400'
+              }`}
+            >
+              💶 Espèces
+            </button>
           </div>
         </div>
 

@@ -25,6 +25,9 @@ export default function SalesList({ ventes, modeles }: Props) {
 
   const total = ventes.reduce((s, v) => s + v.quantite * v.prix_unitaire, 0)
   const qte = ventes.reduce((s, v) => s + v.quantite, 0)
+  const totalCb = ventes.filter((v) => v.mode_paiement === 'cb').reduce((s, v) => s + v.quantite * v.prix_unitaire, 0)
+  const totalEsp = ventes.filter((v) => v.mode_paiement === 'especes').reduce((s, v) => s + v.quantite * v.prix_unitaire, 0)
+  const eur = (n: number) => n.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })
 
   return (
     <div className="space-y-3">
@@ -35,9 +38,8 @@ export default function SalesList({ ventes, modeles }: Props) {
         </div>
         <div className="flex-1 bg-emerald-950/40 border border-emerald-800 rounded-xl px-4 py-3 text-center">
           <div className="text-xs text-slate-400">Chiffre d’affaires</div>
-          <div className="text-lg font-bold text-emerald-400">
-            {total.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })}
-          </div>
+          <div className="text-lg font-bold text-emerald-400">{eur(total)}</div>
+          <div className="text-[11px] text-slate-500 mt-0.5">💳 {eur(totalCb)} · 💶 {eur(totalEsp)}</div>
         </div>
       </div>
 
@@ -53,6 +55,9 @@ export default function SalesList({ ventes, modeles }: Props) {
                 </div>
                 <div className="text-xs text-slate-500 mt-0.5">
                   {new Date(v.date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' })}
+                  {v.mode_paiement && (
+                    <span className="text-slate-400"> · {v.mode_paiement === 'cb' ? '💳 CB' : '💶 Espèces'}</span>
+                  )}
                   {v.notes && <span className="text-slate-600"> · {v.notes}</span>}
                 </div>
               </div>
@@ -110,6 +115,7 @@ function VenteEditModal({
   const [articleId, setArticleId] = useState(vente.article_id)
   const [quantite, setQuantite] = useState(vente.quantite)
   const [prix, setPrix] = useState(String(vente.prix_unitaire))
+  const [mode, setMode] = useState<'cb' | 'especes'>(vente.mode_paiement ?? 'cb')
   const [date, setDate] = useState(vente.date)
   const [notes, setNotes] = useState(vente.notes ?? '')
   const [saving, setSaving] = useState(false)
@@ -146,6 +152,7 @@ function VenteEditModal({
       article_id: articleId,
       quantite,
       prix_unitaire: prix,
+      mode_paiement: mode,
       notes,
     })
     setSaving(false)
@@ -201,6 +208,28 @@ function VenteEditModal({
               type="number" inputMode="decimal" step="0.01" min="0" value={prix}
               onChange={(e) => setPrix(e.target.value)} className="input w-full text-right"
             />
+          </div>
+        </div>
+
+        <div>
+          <label className="text-xs text-slate-400 block mb-1">Paiement</label>
+          <div className="flex gap-3">
+            <button
+              type="button" onClick={() => setMode('cb')}
+              className={`flex-1 py-2 rounded-xl font-medium text-sm transition-colors ${
+                mode === 'cb' ? 'bg-blue-600 text-white' : 'bg-slate-800 text-slate-400'
+              }`}
+            >
+              💳 CB
+            </button>
+            <button
+              type="button" onClick={() => setMode('especes')}
+              className={`flex-1 py-2 rounded-xl font-medium text-sm transition-colors ${
+                mode === 'especes' ? 'bg-emerald-700 text-white' : 'bg-slate-800 text-slate-400'
+              }`}
+            >
+              💶 Espèces
+            </button>
           </div>
         </div>
 
