@@ -1,5 +1,14 @@
 # Sans Chemise — Changelog
 
+## 2026-06-27 — Variantes « phares »
+
+- Nouveau champ `snc_modeles.variantes_phares` (text[]) — migration
+  `0017_sans-chemise-variantes-phares.sql`.
+- Écran Modèles : bouton étoile par variante (toggle direct, optimiste).
+- Écran Vente : les modèles ayant ≥ 1 variante phare passent en tête, avec
+  une étoile sur leur carte.
+- Écran Stock : filtre « phares » (★) combinable avec recherche et variante.
+
 ## 2026-06-27 — Prix par variante éditables depuis les modèles
 
 - Le prix est désormais géré **par variante**, stocké dans

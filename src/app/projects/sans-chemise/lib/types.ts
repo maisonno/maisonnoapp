@@ -4,6 +4,8 @@ export type Modele = {
   prix: number
   // Prix par variante (€) : { "T-Shirt": 29, "Sweat": 49, ... }
   prixVariantes: Record<string, number>
+  // Variantes « phares » (mises en avant)
+  variantesPhares: string[]
   variantes: string[]
   tailles: string[]
   actif: boolean
@@ -19,6 +21,8 @@ export type Article = {
   stock: number
   // Prix propre à l'article (par variante). null → on retombe sur le prix du modèle.
   prix: number | null
+  // La variante de cet article est-elle « phare » ?
+  phare: boolean
 }
 
 // Modèle enrichi de ses articles actifs (pour la saisie de vente)
