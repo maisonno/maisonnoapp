@@ -1,5 +1,17 @@
 # Sans Chemise — Changelog
 
+## 2026-06-27 — Prix par variante éditables depuis les modèles
+
+- Le prix est désormais géré **par variante**, stocké dans
+  `snc_modeles.prix_variantes` (jsonb). Migration
+  `0016_sans-chemise-prix-variantes.sql` (remplace `0015` ; retire
+  `snc_articles.prix`).
+- Le formulaire de modèle affiche un champ **prix par variante** (pré-rempli
+  d'un tarif indicatif quand on coche une variante).
+- La liste des modèles affiche le prix de chaque variante.
+- La saisie de vente pré-remplit le prix de la variante choisie
+  (`prix_variantes[variante] ?? prix`).
+
 ## 2026-06-27 — Prix par variante + ajustement rapide du stock
 
 - Boutons « + » (vert) / « − » (rouge) par ligne dans l'onglet Stock :

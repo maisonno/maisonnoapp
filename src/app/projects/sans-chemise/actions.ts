@@ -49,19 +49,30 @@ async function syncArticles(
 
 type ModeleInput = {
   nom: string
-  prix: string
   variantes: string[]
   tailles: string[]
+  // Prix par variante (€)
+  prixVariantes: Record<string, number>
 }
 
-function parseModele(data: ModeleInput): { error?: string; nom?: string; prix?: number } {
+function parseModele(
+  data: ModeleInput,
+): { error?: string; nom?: string; prix?: number; prixVariantes?: Record<string, number> } {
   const nom = data.nom.trim()
   if (!nom) return { error: 'Le nom est requis' }
   if (data.variantes.length === 0) return { error: 'Sélectionne au moins une variante' }
   if (data.tailles.length === 0) return { error: 'Sélectionne au moins une taille' }
-  const prix = parseFloat(data.prix)
-  if (isNaN(prix) || prix < 0) return { error: 'Prix invalide' }
-  return { nom, prix }
+
+  const prixVariantes: Record<string, number> = {}
+  for (const v of data.variantes) {
+    const raw = data.prixVariantes?.[v]
+    const n = raw === undefined || raw === null ? 0 : Number(raw)
+    if (Number.isNaN(n) || n < 0) return { error: `Prix invalide pour « ${v} »` }
+    prixVariantes[v] = n
+  }
+  // Prix de base = prix le plus bas (sert de repli / d'affichage)
+  const prix = Math.min(...Object.values(prixVariantes))
+  return { nom, prix, prixVariantes }
 }
 
 export async function createModele(data: ModeleInput): Promise<ActionState> {
@@ -74,7 +85,13 @@ export async function createModele(data: ModeleInput): Promise<ActionState> {
 
   const { data: modele, error } = await supabase
     .from('snc_modeles')
-    .insert({ nom: parsed.nom, prix: parsed.prix, variantes: data.variantes, tailles: data.tailles })
+    .insert({
+      nom: parsed.nom,
+      prix: parsed.prix,
+      prix_variantes: parsed.prixVariantes,
+      variantes: data.variantes,
+      tailles: data.tailles,
+    })
     .select('id')
     .single()
 
@@ -94,7 +111,13 @@ export async function updateModele(id: string, data: ModeleInput): Promise<Actio
 
   const { error } = await supabase
     .from('snc_modeles')
-    .update({ nom: parsed.nom, prix: parsed.prix, variantes: data.variantes, tailles: data.tailles })
+    .update({
+      nom: parsed.nom,
+      prix: parsed.prix,
+      prix_variantes: parsed.prixVariantes,
+      variantes: data.variantes,
+      tailles: data.tailles,
+    })
     .eq('id', id)
 
   if (error) return { error: error.message }

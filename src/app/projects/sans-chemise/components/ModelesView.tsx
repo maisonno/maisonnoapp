@@ -56,11 +56,17 @@ export default function ModelesView({ modeles }: Props) {
                     {m.nom}
                     {!m.actif && <span className="ml-2 text-xs text-slate-500">(inactif)</span>}
                   </div>
-                  <div className="text-blue-400 text-sm font-medium">
-                    {m.prix.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })}
+                  <div className="flex flex-wrap gap-x-2 gap-y-0.5 mt-1">
+                    {m.variantes.map((v) => (
+                      <span key={v} className="text-xs text-slate-400">
+                        {v}{' '}
+                        <span className="text-blue-400 font-medium">
+                          {(m.prixVariantes[v] ?? m.prix).toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })}
+                        </span>
+                      </span>
+                    ))}
                   </div>
-                  <div className="text-xs text-slate-500 mt-1.5">{m.variantes.join(' · ')}</div>
-                  <div className="text-xs text-slate-600 mt-0.5">Tailles : {m.tailles.join(', ')}</div>
+                  <div className="text-xs text-slate-600 mt-1">Tailles : {m.tailles.join(', ')}</div>
                 </div>
               </div>
               <div className="flex gap-3 mt-2 pt-2 border-t border-slate-800/70">
