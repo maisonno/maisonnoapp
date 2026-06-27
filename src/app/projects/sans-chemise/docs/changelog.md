@@ -1,5 +1,16 @@
 # Sans Chemise — Changelog
 
+## 2026-06-27 — Prix par variante + ajustement rapide du stock
+
+- Boutons « + » (vert) / « − » (rouge) par ligne dans l'onglet Stock :
+  enregistrement d'un mouvement de ±1 avec mise à jour optimiste.
+- Prix par article (`snc_articles.prix`, par variante) — migration
+  `0015_sans-chemise-prix.sql`. La saisie de vente pré-remplit le prix de la
+  variante sélectionnée (repli sur le prix du modèle).
+- Tarifs appliqués : T-Shirt / T-Shirt Femme / Débardeur 29 €, Sweat 49 €,
+  T-Shirt Col V 35 €, Mug 15 €. (Casquette, Gourde, Coque iPhone : à définir.)
+
+
 ## 2026-06-27 — Création du projet
 
 Première version de l'app de stock & ventes Sans Chemise.

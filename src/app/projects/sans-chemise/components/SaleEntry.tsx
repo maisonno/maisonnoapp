@@ -83,10 +83,16 @@ function SaleSheet({
     return modele.variantes.filter((v) => set.has(v))
   }, [modele])
 
+  // Prix de référence d'une variante (prix de l'article, sinon prix du modèle)
+  const priceForVariante = (v: string) => {
+    const first = modele.articles.find((a) => a.variante === v)
+    return first?.prix ?? modele.prix
+  }
+
   const [variante, setVariante] = useState(variantes[0] ?? '')
   const [article, setArticle] = useState<Article | null>(null)
   const [quantite, setQuantite] = useState(1)
-  const [prix, setPrix] = useState(String(modele.prix))
+  const [prix, setPrix] = useState(String(priceForVariante(variantes[0] ?? '')))
   const [date, setDate] = useState(today)
   const [showDate, setShowDate] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -100,6 +106,7 @@ function SaleSheet({
   const handleVariante = (v: string) => {
     setVariante(v)
     setArticle(null)
+    setPrix(String(priceForVariante(v)))
   }
 
   const handleSubmit = async () => {
@@ -161,7 +168,7 @@ function SaleSheet({
               return (
                 <button
                   key={a.id}
-                  onClick={() => { setArticle(a); setError(null) }}
+                  onClick={() => { setArticle(a); setPrix(String(a.prix ?? modele.prix)); setError(null) }}
                   className={`flex flex-col items-center py-2 rounded-xl border text-sm font-semibold transition-colors ${
                     active
                       ? 'bg-blue-600 border-blue-500 text-white'

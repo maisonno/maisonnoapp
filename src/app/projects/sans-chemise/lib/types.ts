@@ -15,6 +15,8 @@ export type Article = {
   taille: string
   actif: boolean
   stock: number
+  // Prix propre à l'article (par variante). null → on retombe sur le prix du modèle.
+  prix: number | null
 }
 
 // Modèle enrichi de ses articles actifs (pour la saisie de vente)
