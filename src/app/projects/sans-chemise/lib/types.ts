@@ -31,12 +31,15 @@ export type ModeleWithArticles = Modele & {
   stockTotal: number
 }
 
+export type ModePaiement = 'cb' | 'especes'
+
 export type Vente = {
   id: string
   date: string
   article_id: string
   quantite: number
   prix_unitaire: number
+  mode_paiement: ModePaiement | null
   notes: string | null
   created_at: string
   // dénormalisé pour l'affichage

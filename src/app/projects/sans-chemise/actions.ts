@@ -185,16 +185,20 @@ type VenteInput = {
   article_id: string
   quantite: number
   prix_unitaire: string
+  mode_paiement: 'cb' | 'especes'
   notes: string
 }
 
-function parseVente(data: VenteInput): { error?: string; prix?: number; quantite?: number } {
+function parseVente(
+  data: VenteInput,
+): { error?: string; prix?: number; quantite?: number; mode_paiement?: 'cb' | 'especes' } {
   if (!data.article_id) return { error: 'Article manquant' }
   const quantite = Math.round(Number(data.quantite))
   if (!quantite || quantite < 1) return { error: 'Quantité invalide' }
   const prix = parseFloat(data.prix_unitaire)
   if (isNaN(prix) || prix < 0) return { error: 'Prix invalide' }
-  return { prix, quantite }
+  const mode_paiement = data.mode_paiement === 'especes' ? 'especes' : 'cb'
+  return { prix, quantite, mode_paiement }
 }
 
 export async function createVente(data: VenteInput): Promise<ActionState> {
@@ -210,6 +214,7 @@ export async function createVente(data: VenteInput): Promise<ActionState> {
     article_id: data.article_id,
     quantite: parsed.quantite,
     prix_unitaire: parsed.prix,
+    mode_paiement: parsed.mode_paiement,
     notes: data.notes.trim() || null,
     created_by: user.id,
   })
@@ -231,6 +236,7 @@ export async function updateVente(id: string, data: VenteInput): Promise<ActionS
     article_id: data.article_id,
     quantite: parsed.quantite,
     prix_unitaire: parsed.prix,
+    mode_paiement: parsed.mode_paiement,
     notes: data.notes.trim() || null,
   }).eq('id', id)
 

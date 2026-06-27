@@ -1,5 +1,13 @@
 # Sans Chemise — Changelog
 
+## 2026-06-27 — Mode de paiement (CB / espèces)
+
+- Nouveau champ `snc_ventes.mode_paiement` (`'cb'`|`'especes'`) — migration
+  `0018_sans-chemise-mode-paiement.sql`.
+- Saisie de vente : sélecteur CB / Espèces (CB par défaut).
+- Liste des ventes : mode affiché par ligne, édition possible, et répartition
+  du CA 💳 CB / 💶 Espèces dans le récap.
+
 ## 2026-06-27 — Variantes « phares »
 
 - Nouveau champ `snc_modeles.variantes_phares` (text[]) — migration

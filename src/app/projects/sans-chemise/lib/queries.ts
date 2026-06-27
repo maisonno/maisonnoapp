@@ -149,7 +149,7 @@ export async function getVentes(limit = 100): Promise<Vente[]> {
   const { data } = await supabase
     .from('snc_ventes')
     .select(`
-      id, date, article_id, quantite, prix_unitaire, notes, created_at,
+      id, date, article_id, quantite, prix_unitaire, mode_paiement, notes, created_at,
       snc_articles ( variante, taille, snc_modeles ( nom ) )
     `)
     .order('date', { ascending: false })
@@ -164,6 +164,7 @@ export async function getVentes(limit = 100): Promise<Vente[]> {
       article_id: row.article_id,
       quantite: row.quantite,
       prix_unitaire: Number(row.prix_unitaire),
+      mode_paiement: row.mode_paiement,
       notes: row.notes,
       created_at: row.created_at,
       modele_nom: article?.snc_modeles?.nom ?? '—',
