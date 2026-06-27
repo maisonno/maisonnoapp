@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import type { Article, Mouvement } from '../lib/types'
 import { createMouvement, deleteMouvement } from '../actions'
@@ -16,6 +16,31 @@ export default function StockView({ articles, mouvements }: Props) {
   const router = useRouter()
   const [target, setTarget] = useState<ArticleRow | null>(null)
   const [defaultSens, setDefaultSens] = useState<'reception' | 'retrait'>('reception')
+  // Stock affiché de façon optimiste pendant l'enregistrement des ±1
+  const [optimistic, setOptimistic] = useState<Record<string, number>>({})
+
+  // Remet à zéro l'optimisme dès que le serveur renvoie des données fraîches
+  useEffect(() => { setOptimistic({}) }, [articles])
+
+  const stockOf = (a: ArticleRow) => optimistic[a.id] ?? a.stock
+
+  const quickMove = async (a: ArticleRow, sens: 'reception' | 'retrait') => {
+    const delta = sens === 'reception' ? 1 : -1
+    setOptimistic((o) => ({ ...o, [a.id]: stockOf(a) + delta }))
+    const res = await createMouvement({
+      date: new Date().toISOString().split('T')[0],
+      article_id: a.id,
+      quantite: 1,
+      sens,
+      motif: '',
+    })
+    if (res.error) {
+      setOptimistic((o) => ({ ...o, [a.id]: (o[a.id] ?? a.stock) - delta }))
+      alert(res.error)
+      return
+    }
+    router.refresh()
+  }
 
   // Regroupe par modèle
   const groups = useMemo(() => {
@@ -28,7 +53,7 @@ export default function StockView({ articles, mouvements }: Props) {
     return Array.from(map.entries())
   }, [articles])
 
-  const stockTotal = articles.reduce((s, a) => s + a.stock, 0)
+  const stockTotal = articles.reduce((s, a) => s + stockOf(a), 0)
 
   if (articles.length === 0) {
     return (
@@ -46,30 +71,50 @@ export default function StockView({ articles, mouvements }: Props) {
       </div>
 
       <p className="text-xs text-slate-500">
-        Touche un article pour <span className="text-emerald-400">réceptionner un colis</span> ou{' '}
-        <span className="text-red-400">retirer du stock</span>.
+        Touche <span className="text-emerald-400 font-semibold">+</span> /{' '}
+        <span className="text-red-400 font-semibold">−</span> pour ajuster d’une unité, ou le nom de
+        l’article pour une réception/retrait en quantité.
       </p>
 
       {groups.map(([nom, rows]) => (
         <div key={nom} className="space-y-1.5">
           <h3 className="text-sm font-semibold text-slate-300">{nom}</h3>
           <div className="space-y-1.5">
-            {rows.map((a) => (
-              <button
-                key={a.id}
-                onClick={() => { setDefaultSens('reception'); setTarget(a) }}
-                className="w-full flex items-center justify-between bg-slate-900 border border-slate-800 hover:border-slate-600 rounded-xl px-4 py-2.5 transition-colors"
-              >
-                <span className="text-sm text-slate-300">
-                  {a.variante} · <span className="font-medium text-slate-200">{a.taille}</span>
-                </span>
-                <span className={`text-sm font-bold ${
-                  a.stock <= 0 ? 'text-red-400' : a.stock <= 3 ? 'text-amber-400' : 'text-slate-100'
-                }`}>
-                  {a.stock}
-                </span>
-              </button>
-            ))}
+            {rows.map((a) => {
+              const stock = stockOf(a)
+              return (
+                <div
+                  key={a.id}
+                  className="flex items-center gap-2 bg-slate-900 border border-slate-800 rounded-xl pl-4 pr-2 py-1.5"
+                >
+                  <button
+                    onClick={() => { setDefaultSens('reception'); setTarget(a) }}
+                    className="flex-1 min-w-0 text-left text-sm text-slate-300 py-1.5 hover:text-slate-100 transition-colors"
+                  >
+                    {a.variante} · <span className="font-medium text-slate-200">{a.taille}</span>
+                  </button>
+                  <span className={`w-7 text-center text-sm font-bold tabular-nums ${
+                    stock <= 0 ? 'text-red-400' : stock <= 3 ? 'text-amber-400' : 'text-slate-100'
+                  }`}>
+                    {stock}
+                  </span>
+                  <button
+                    onClick={() => quickMove(a, 'retrait')}
+                    aria-label="Retirer une unité"
+                    className="w-8 h-8 shrink-0 rounded-lg bg-red-600/15 text-red-400 text-lg font-bold leading-none active:bg-red-600/30 transition-colors"
+                  >
+                    −
+                  </button>
+                  <button
+                    onClick={() => quickMove(a, 'reception')}
+                    aria-label="Ajouter une unité"
+                    className="w-8 h-8 shrink-0 rounded-lg bg-emerald-600/15 text-emerald-400 text-lg font-bold leading-none active:bg-emerald-600/30 transition-colors"
+                  >
+                    +
+                  </button>
+                </div>
+              )
+            })}
           </div>
         </div>
       ))}
