@@ -2,6 +2,8 @@ export type Modele = {
   id: string
   nom: string
   prix: number
+  // Prix par variante (€) : { "T-Shirt": 29, "Sweat": 49, ... }
+  prixVariantes: Record<string, number>
   variantes: string[]
   tailles: string[]
   actif: boolean

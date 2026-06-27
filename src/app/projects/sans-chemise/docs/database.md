@@ -13,7 +13,8 @@ Un design vendu sous plusieurs déclinaisons.
 |---|---|---|
 | id | uuid PK | |
 | nom | text | nom du modèle |
-| prix | numeric | prix de vente de base (€), pré-rempli à la vente |
+| prix | numeric | prix de base (€) = repli ; auto = plus bas des prix de variante |
+| prix_variantes | jsonb | prix par variante, ex. `{"T-Shirt":29,"Sweat":49}` |
 | variantes | text[] | ex. `{Tshirt homme, Sweat}` |
 | tailles | text[] | ex. `{S, M, L, XL}` |
 | actif | boolean | un modèle inactif n'apparaît plus à la vente |
@@ -29,13 +30,13 @@ Générée automatiquement depuis le modèle.
 | modele_id | uuid FK → snc_modeles | `on delete cascade` |
 | variante | text | |
 | taille | text | |
-| prix | numeric NULL | prix propre à l'article (par variante) ; `NULL` → repli sur `snc_modeles.prix` |
 | actif | boolean | désactivé quand la combinaison est retirée du modèle |
 | | | `unique (modele_id, variante, taille)` |
 
-> Le prix appliqué à la vente est pré-rempli avec `article.prix ?? modele.prix`
-> (puis modifiable). Cf. migration `0015_sans-chemise-prix.sql` pour la
-> tarification par variante.
+> Le prix est géré **par variante** sur le modèle (`prix_variantes`). Le prix
+> appliqué à la vente est pré-rempli avec `prix_variantes[variante] ?? prix`
+> (puis modifiable), et s'édite depuis l'écran de gestion des modèles.
+> Cf. migration `0016_sans-chemise-prix-variantes.sql` (qui remplace `0015`).
 
 ### `snc_ventes`
 Une ligne = une vente d'un article.

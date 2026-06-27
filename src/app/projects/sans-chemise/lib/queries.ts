@@ -2,16 +2,28 @@ import { createClient } from '@/lib/supabase/server'
 import type { Article, Modele, ModeleWithArticles, Mouvement, Vente } from './types'
 import { sortTailles, TAILLES } from './constants'
 
+// Normalise la colonne jsonb prix_variantes en map { variante: prix(number) }
+function parsePrixVariantes(raw: unknown): Record<string, number> {
+  if (!raw || typeof raw !== 'object') return {}
+  const out: Record<string, number> = {}
+  for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+    const n = Number(v)
+    if (!Number.isNaN(n)) out[k] = n
+  }
+  return out
+}
+
 export async function getModeles(): Promise<Modele[]> {
   const supabase = await createClient()
   const { data } = await supabase
     .from('snc_modeles')
-    .select('id, nom, prix, variantes, tailles, actif')
+    .select('id, nom, prix, prix_variantes, variantes, tailles, actif')
     .order('nom')
   return (data ?? []).map((m) => ({
     id: m.id,
     nom: m.nom,
     prix: Number(m.prix),
+    prixVariantes: parsePrixVariantes(m.prix_variantes),
     variantes: m.variantes ?? [],
     tailles: sortTailles(m.tailles ?? []),
     actif: m.actif,
@@ -24,13 +36,24 @@ export async function getModelesWithStock(): Promise<ModeleWithArticles[]> {
   const supabase = await createClient()
 
   const [modelesRes, articlesRes, stockRes] = await Promise.all([
-    supabase.from('snc_modeles').select('id, nom, prix, variantes, tailles, actif').eq('actif', true).order('nom'),
-    supabase.from('snc_articles').select('id, modele_id, variante, taille, actif, prix').eq('actif', true),
+    supabase.from('snc_modeles').select('id, nom, prix, prix_variantes, variantes, tailles, actif').eq('actif', true).order('nom'),
+    supabase.from('snc_articles').select('id, modele_id, variante, taille, actif').eq('actif', true),
     supabase.from('snc_v_stock').select('article_id, stock'),
   ])
 
   const stockMap = new Map<string, number>()
   for (const row of stockRes.data ?? []) stockMap.set(row.article_id, Number(row.stock))
+
+  // Prix de base + prix par variante de chaque modèle (pour dériver le prix d'un article)
+  const priceInfo = new Map<string, { base: number; pv: Record<string, number> }>()
+  for (const m of modelesRes.data ?? []) {
+    priceInfo.set(m.id, { base: Number(m.prix), pv: parsePrixVariantes(m.prix_variantes) })
+  }
+  const priceOf = (modeleId: string, variante: string): number | null => {
+    const info = priceInfo.get(modeleId)
+    if (!info) return null
+    return info.pv[variante] ?? info.base ?? null
+  }
 
   const articlesByModele = new Map<string, Article[]>()
   for (const a of articlesRes.data ?? []) {
@@ -42,7 +65,7 @@ export async function getModelesWithStock(): Promise<ModeleWithArticles[]> {
       taille: a.taille,
       actif: a.actif,
       stock: stockMap.get(a.id) ?? 0,
-      prix: a.prix != null ? Number(a.prix) : null,
+      prix: priceOf(a.modele_id, a.variante),
     })
     articlesByModele.set(a.modele_id, list)
   }
@@ -57,6 +80,7 @@ export async function getModelesWithStock(): Promise<ModeleWithArticles[]> {
       id: m.id,
       nom: m.nom,
       prix: Number(m.prix),
+      prixVariantes: parsePrixVariantes(m.prix_variantes),
       variantes: m.variantes ?? [],
       tailles: sortTailles(m.tailles ?? []),
       actif: m.actif,
@@ -70,29 +94,34 @@ export async function getModelesWithStock(): Promise<ModeleWithArticles[]> {
 export async function getArticlesWithStock(): Promise<(Article & { modele_nom: string })[]> {
   const supabase = await createClient()
   const [articlesRes, modelesRes, stockRes] = await Promise.all([
-    supabase.from('snc_articles').select('id, modele_id, variante, taille, actif, prix').eq('actif', true),
-    supabase.from('snc_modeles').select('id, nom, variantes').eq('actif', true),
+    supabase.from('snc_articles').select('id, modele_id, variante, taille, actif').eq('actif', true),
+    supabase.from('snc_modeles').select('id, nom, prix, prix_variantes, variantes').eq('actif', true),
     supabase.from('snc_v_stock').select('article_id, stock'),
   ])
 
   const stockMap = new Map<string, number>()
   for (const row of stockRes.data ?? []) stockMap.set(row.article_id, Number(row.stock))
 
-  const modeleMap = new Map<string, { nom: string; variantes: string[] }>()
-  for (const m of modelesRes.data ?? []) modeleMap.set(m.id, { nom: m.nom, variantes: m.variantes ?? [] })
+  const modeleMap = new Map<string, { nom: string; base: number; pv: Record<string, number> }>()
+  for (const m of modelesRes.data ?? []) {
+    modeleMap.set(m.id, { nom: m.nom, base: Number(m.prix), pv: parsePrixVariantes(m.prix_variantes) })
+  }
 
   return (articlesRes.data ?? [])
     .filter((a) => modeleMap.has(a.modele_id))
-    .map((a) => ({
-      id: a.id,
-      modele_id: a.modele_id,
-      variante: a.variante,
-      taille: a.taille,
-      actif: a.actif,
-      stock: stockMap.get(a.id) ?? 0,
-      prix: a.prix != null ? Number(a.prix) : null,
-      modele_nom: modeleMap.get(a.modele_id)!.nom,
-    }))
+    .map((a) => {
+      const info = modeleMap.get(a.modele_id)!
+      return {
+        id: a.id,
+        modele_id: a.modele_id,
+        variante: a.variante,
+        taille: a.taille,
+        actif: a.actif,
+        stock: stockMap.get(a.id) ?? 0,
+        prix: info.pv[a.variante] ?? info.base ?? null,
+        modele_nom: info.nom,
+      }
+    })
     .sort((a, b) => {
       if (a.modele_nom !== b.modele_nom) return a.modele_nom.localeCompare(b.modele_nom)
       if (a.variante !== b.variante) return a.variante.localeCompare(b.variante)
