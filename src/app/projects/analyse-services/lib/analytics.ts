@@ -6,7 +6,7 @@
 //  - service du soir = heure ≥ cutoff OU heure < 5 (rebouclage nuit) ;
 //  - Poire = cash TTC au jour, ajoutée au bar et au total, non ventilée midi/soir.
 
-import type { Base, DashControls, PoireDay, TicketMetric, TicketType } from './types'
+import type { Base, DashControls, LaborRow, PoireDay, TicketMetric, TicketType } from './types'
 
 const NIGHT = 5
 
@@ -367,4 +367,80 @@ export function monthlyPivot(
     (a, b) => a - b,
   )
   return { years, months, cells }
+}
+
+// ─── Coûts salariaux (export Combo) ───
+//
+// Estimation enrichie du BRUT mensuel par salarié (règles validées) :
+//   taux horaire = salaire_base / heures_contrat_mensuel ;
+//   + heures supp hors contrat valorisées (×1,10 / ×1,20 / ×1,50) ;
+//   + heures fériés et 1er mai majorées (+100 %) ;
+//   + 6ème jour : salaire_base / 6 (« 6 jours payés 7 ») ;
+//   PAS de majoration de nuit (convention CHR) ;
+//   provision congés payés : +10 % sur l'ensemble.
+// C'est une ESTIMATION de gestion, pas un calcul de paie.
+
+const CP_RATE = 0.1 // provision congés payés
+const SIXTH_DAY = 1 / 6 // « 6 jours payés 7 »
+
+export function estimateBrut(r: LaborRow): number {
+  const base = r.salaire_base || 0
+  const h = r.heures_contrat_mensuel || 0
+  const hr = h > 0 ? base / h : 0
+  const supp =
+    hr *
+    ((r.h_supp_10 || 0) * 1.1 + (r.h_supp_20 || 0) * 1.2 + (r.h_supp_50 || 0) * 1.5)
+  const ferie = hr * (r.h_feries || 0) * 1.0
+  const mai = hr * (r.h_1er_mai || 0) * 1.0
+  const sixth = base * SIXTH_DAY
+  return (base + supp + ferie + mai + sixth) * (1 + CP_RATE)
+}
+
+// Brut estimé agrégé par mois de paie (clé 'YYYY-MM')
+export function laborBrutByMonth(rows: LaborRow[]): Record<string, number> {
+  const m: Record<string, number> = {}
+  for (const r of rows) {
+    const ym = r.periode.slice(0, 7)
+    m[ym] = (m[ym] || 0) + estimateBrut(r)
+  }
+  return m
+}
+
+export const hasLabor = (m: Record<string, number>) => Object.keys(m).length > 0
+
+export type LaborResult = {
+  brut: number // brut sur la fenêtre (proraté aux jours ouverts)
+  charged: number // brut × (1 + taux charges)
+  perDay: Record<string, number> // coût chargé réparti par jour (fenêtre)
+  hasData: boolean
+}
+
+// Répartit le brut mensuel sur les jours ouverts du mois, puis proratise à la
+// fenêtre : coût du jour = (brut_mois / jours_ouverts_mois) × poids_du_jour.
+export function computeLabor(
+  C: ComputeResult,
+  monthOpenDays: Record<string, number>,
+  brutByMonth: Record<string, number>,
+  chargeRate: number,
+): LaborResult {
+  const perDay: Record<string, number> = {}
+  let brut = 0
+  let charged = 0
+  let hasData = false
+  for (const d in C.days) {
+    const ym = d.slice(0, 7)
+    const monthBrut = brutByMonth[ym]
+    if (monthBrut == null) continue
+    hasData = true
+    const od = monthOpenDays[ym] || 0
+    if (od <= 0) continue
+    const day = C.days[d]
+    const w = (day.midiTk >= OPEN_MIN ? W_MIDI : 0) + (day.soirTk >= OPEN_MIN ? W_SOIR : 0)
+    const dayBrut = (monthBrut / od) * w
+    const dayCharged = dayBrut * (1 + chargeRate)
+    perDay[d] = dayCharged
+    brut += dayBrut
+    charged += dayCharged
+  }
+  return { brut, charged, perDay, hasData }
 }

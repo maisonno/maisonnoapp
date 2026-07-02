@@ -2,15 +2,19 @@
 
 import { useMemo, useState } from 'react'
 import Link from 'next/link'
-import type { Base, DashControls, PoireDay, TicketMetric } from '../lib/types'
+import type { Base, DashControls, LaborRow, PoireDay, TicketMetric } from '../lib/types'
 import {
   buildPoireMap,
   compute,
+  computeLabor,
   grandTotal,
+  hasLabor,
   hasPoire,
+  laborBrutByMonth,
   mergeRes,
   monthlyPivot,
   yearStats,
+  type LaborResult,
   type MonthCell,
   type MonthlyPivot,
   type RestoCell,
@@ -21,11 +25,12 @@ import { EUR, EUR2, INT, N1, PCT, frDMY, frDate, frMD } from '../lib/format'
 type Props = {
   tickets: TicketMetric[]
   poire: PoireDay[]
+  labor: LaborRow[]
 }
 
 const CUTOFFS = [17, 16, 18, 19, 12]
 
-export default function Dashboard({ tickets, poire }: Props) {
+export default function Dashboard({ tickets, poire, labor }: Props) {
   const poireMap = useMemo(() => buildPoireMap(poire), [poire])
   const hasP = hasPoire(poireMap)
 
@@ -48,6 +53,7 @@ export default function Dashboard({ tickets, poire }: Props) {
   const [cutoff, setCutoff] = useState(17)
   const [base, setBase] = useState<Base>('ttc')
   const [incPoire, setIncPoire] = useState(true)
+  const [chargeRate, setChargeRate] = useState(0.42) // charges patronales (éditable)
 
   const ctrl: DashControls = { from, to, cutoff, base, incPoire }
   const C = useMemo(
@@ -69,6 +75,28 @@ export default function Dashboard({ tickets, poire }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [tickets, poireMap, cutoff, base, incPoire],
   )
+
+  // Coûts salariaux : brut estimé par mois + jours ouverts par mois (mois entier)
+  const brutByMonth = useMemo(() => laborBrutByMonth(labor), [labor])
+  const hasLab = hasLabor(brutByMonth)
+  const monthOpenDays = useMemo(() => {
+    const m: Record<string, number> = {}
+    for (const [k, c] of Object.entries(pivot.cells)) {
+      const [y, mo] = k.split('-')
+      m[`${y}-${mo.padStart(2, '0')}`] = c.openDays
+    }
+    return m
+  }, [pivot])
+  const caByMonth = useMemo(() => {
+    const m: Record<string, number> = {}
+    for (const [k, c] of Object.entries(pivot.cells)) {
+      const [y, mo] = k.split('-')
+      m[`${y}-${mo.padStart(2, '0')}`] = c.caTotal
+    }
+    return m
+  }, [pivot])
+  const L = computeLabor(C, monthOpenDays, brutByMonth, chargeRate)
+  const pctMasse = grand > 0 ? (100 * L.charged) / grand : null
 
   return (
     <div className="wrap">
@@ -221,10 +249,25 @@ export default function Dashboard({ tickets, poire }: Props) {
       {/* Tableau par mois */}
       <Monthly pivot={pivot} baseUp={baseUp} />
 
+      {/* Coûts salariaux */}
+      {hasLab && (
+        <LaborSection
+          L={L}
+          brutByMonth={brutByMonth}
+          monthOpenDays={monthOpenDays}
+          caByMonth={caByMonth}
+          chargeRate={chargeRate}
+          setChargeRate={setChargeRate}
+          pctMasse={pctMasse}
+          openDays={C.openDays}
+          baseUp={baseUp}
+        />
+      )}
+
       {/* Jour par jour */}
       <section>
         <div className="h2">Jour par jour</div>
-        <Daily C={C} poireMap={poireMap} ctrl={ctrl} hasP={hasP} />
+        <Daily C={C} poireMap={poireMap} ctrl={ctrl} hasP={hasP} laborPerDay={L.perDay} hasLab={hasLab} />
       </section>
 
       <Foot cutoff={cutoff} baseUp={baseUp} hasP={hasP} />
@@ -663,6 +706,125 @@ function Monthly({ pivot, baseUp }: { pivot: MonthlyPivot; baseUp: string }) {
   )
 }
 
+// ─── Coûts salariaux ───
+
+function LaborSection({
+  L,
+  brutByMonth,
+  monthOpenDays,
+  caByMonth,
+  chargeRate,
+  setChargeRate,
+  pctMasse,
+  openDays,
+  baseUp,
+}: {
+  L: LaborResult
+  brutByMonth: Record<string, number>
+  monthOpenDays: Record<string, number>
+  caByMonth: Record<string, number>
+  chargeRate: number
+  setChargeRate: (n: number) => void
+  pctMasse: number | null
+  openDays: number
+  baseUp: string
+}) {
+  const months = Object.keys(brutByMonth).sort()
+  const chargedPerDay = openDays > 0 ? L.charged / openDays : null
+
+  return (
+    <section>
+      <div className="h2">
+        Coûts salariaux <span className="tag">estimation · {EUR(L.charged)} chargé</span>
+      </div>
+
+      <div className="controls" style={{ marginBottom: 12 }}>
+        <div className="field">
+          <label>Charges patronales</label>
+          <div className="seg" style={{ alignItems: 'center' }}>
+            <input
+              type="number"
+              min={0}
+              max={100}
+              step={1}
+              value={Math.round(chargeRate * 100)}
+              onChange={(e) => setChargeRate((parseFloat(e.target.value) || 0) / 100)}
+              style={{ width: 70 }}
+            />
+            <span style={{ padding: '0 8px' }}>%</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="kpis">
+        <div className="kpi">
+          <div className="l">Coût brut (période)</div>
+          <div className="v">{EUR(L.brut)}</div>
+          <div className="sub">salaire de base + heures supp + fériés + 6ème jour + CP</div>
+        </div>
+        <div className="kpi">
+          <div className="l">Coût chargé (période)</div>
+          <div className="v">{EUR(L.charged)}</div>
+          <div className="sub">brut × (1 + {Math.round(chargeRate * 100)} % charges)</div>
+        </div>
+        <div className="kpi">
+          <div className="l">% masse salariale / CA</div>
+          <div className="v">{pctMasse != null ? PCT(pctMasse) : '—'}</div>
+          <div className="sub">coût chargé / CA {baseUp} de la période</div>
+        </div>
+        <div className="kpi">
+          <div className="l">Coût chargé / jour ouvert</div>
+          <div className="v">{chargedPerDay != null ? EUR(chargedPerDay) : '—'}</div>
+          <div className="sub">{N1(openDays)} jour(s) ouvert(s) sur la période</div>
+        </div>
+      </div>
+
+      <div className="daily" style={{ marginTop: 14 }}>
+        <table className="day">
+          <thead>
+            <tr>
+              <th>Mois de paie</th>
+              <th>Brut estimé</th>
+              <th>Chargé</th>
+              <th>Jours ouverts</th>
+              <th>Chargé / j</th>
+              <th>% CA</th>
+            </tr>
+          </thead>
+          <tbody>
+            {months.map((ym) => {
+              const brut = brutByMonth[ym]
+              const charged = brut * (1 + chargeRate)
+              const od = monthOpenDays[ym] || 0
+              const ca = caByMonth[ym] || 0
+              return (
+                <tr key={ym}>
+                  <td>{ym}</td>
+                  <td>{EUR(brut)}</td>
+                  <td>{EUR(charged)}</td>
+                  <td>{od > 0 ? N1(od) : '—'}</td>
+                  <td>{od > 0 ? EUR(charged / od) : '—'}</td>
+                  <td>{ca > 0 ? PCT((100 * charged) / ca) : '—'}</td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="foot">
+        <b>Estimation de gestion</b> à partir de l&apos;export comptable Combo (anonymisé : aucun nom stocké).
+        Brut = salaire de base + heures supp hors contrat valorisées (×1,10 / ×1,20 / ×1,50 au taux horaire
+        contractuel) + heures fériés et 1er mai (+100 %) + <b>6ème jour</b> (salaire de base ÷ 6, « 6 jours payés
+        7 ») + provision <b>congés payés</b> +10 % ; pas de majoration de nuit (CHR). Coût chargé = brut × (1 +
+        taux de charges patronales, éditable ci-dessus). Le coût mensuel est réparti sur les <b>jours d&apos;ouverture</b>
+        du mois puis prorata de la période affichée. Le « double du 6ème jour » réel n&apos;étant pas isolable dans
+        l&apos;export, il est approché par la règle ci-dessus.
+      </div>
+    </section>
+  )
+}
+
 // ─── Jour par jour ───
 
 function Daily({
@@ -670,14 +832,18 @@ function Daily({
   poireMap,
   ctrl,
   hasP,
+  laborPerDay,
+  hasLab,
 }: {
   C: ReturnType<typeof compute>
   poireMap: Record<string, number>
   ctrl: DashControls
   hasP: boolean
+  laborPerDay: Record<string, number>
+  hasLab: boolean
 }) {
   const ds = Object.keys(C.days).sort()
-  const tt = { resto: 0, dessert: 0, bar: 0, couverts: 0, poire: 0, total: 0 }
+  const tt = { resto: 0, dessert: 0, bar: 0, couverts: 0, poire: 0, total: 0, labor: 0 }
   // Poire = cash non soumis à la TVA → même montant en TTC et HT.
   const poireVal = (montant: number) => (ctrl.incPoire && hasP ? montant : 0)
 
@@ -685,12 +851,14 @@ function Daily({
     const x = C.days[d]
     const pV = poireVal(poireMap[d] || 0)
     const lineTot = x.total + pV
+    const lab = laborPerDay[d] || 0
     tt.resto += x.resto
     tt.dessert += x.dessert
     tt.bar += x.bar
     tt.couverts += x.couverts
     tt.poire += pV
     tt.total += lineTot
+    tt.labor += lab
     return (
       <tr key={d}>
         <td>{frDate(d)}</td>
@@ -702,6 +870,7 @@ function Daily({
         <td>
           <b>{EUR(lineTot)}</b>
         </td>
+        {hasLab ? <td className="labor">{lab ? EUR(lab) : '—'}</td> : null}
       </tr>
     )
   })
@@ -718,6 +887,7 @@ function Daily({
             {hasP ? <th>Poire</th> : null}
             <th>Couverts</th>
             <th>Total</th>
+            {hasLab ? <th>Masse sal.</th> : null}
           </tr>
         </thead>
         <tbody>
@@ -730,6 +900,7 @@ function Daily({
             {hasP ? <td>{EUR(tt.poire)}</td> : null}
             <td>{INT(tt.couverts)}</td>
             <td>{EUR(tt.total)}</td>
+            {hasLab ? <td>{EUR(tt.labor)}</td> : null}
           </tr>
         </tbody>
       </table>

@@ -50,9 +50,25 @@ Index : `idx_ana_lines_ticket`, `idx_ana_lines_jour`.
 `categorie` (PK) → `bucket` ∈ {entree, plat, dessert, boisson, autre}. Seedé par la
 migration, éditable en SQL sans redéploiement.
 
+### `ana_labor` — coûts salariaux (export Combo), anonymisé
+Migration `0013_labor.sql`. 1 ligne = 1 salarié × 1 mois de paie.
+| Colonne | Type | Note |
+|---|---|---|
+| `periode` | date | 1er jour du mois de paie (PK avec `employe_hash`) |
+| `employe_hash` | text | hash anonyme (Nom+Prénom+contrat) — **aucun nom stocké** |
+| `poste`, `contrat` | text | non nominatifs |
+| `salaire_base` | numeric | « Salaire de base » (brut mensuel de base) |
+| `heures_contrat_mensuel`, `heures_travaillees`, `jours_travailles` | numeric | |
+| `h_supp_10/20/50`, `h_nuit`, `h_feries`, `h_1er_mai` | numeric | heures de coût (à valoriser) |
+| `conges_payes_j` | numeric | congés payés (jours) |
+| `source_file`, `imported_at` | | |
+
+PK `(periode, employe_hash)` → ré-importer un mois ne crée pas de doublon. Le
+calcul du brut/chargé est fait en TypeScript (`analytics.ts`), pas en base.
+
 ### `ana_import_log` — journal des imports
-`id`, `kind` ('ventes'|'poire'), `file_name`, `rows_in`, `tickets_upserted`,
-`lines_upserted`, `poire_upserted`, `created_at`.
+`id`, `kind` ('ventes'|'poire'|'combo'), `file_name`, `rows_in`, `tickets_upserted`,
+`lines_upserted`, `poire_upserted`, `labor_upserted`, `created_at`.
 
 ## Fonction `ana_f_bucket(categorie, nom)`
 Réplique de `bucket()` du HTML : cherche d'abord dans `ana_category_map`, sinon

@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
-import { getAllPoire, getAllTicketMetrics } from './lib/queries'
+import { getAllLabor, getAllPoire, getAllTicketMetrics } from './lib/queries'
 import Dashboard from './components/Dashboard'
 
 export const metadata = { title: 'Analyse des services — La Pomme d\'Adam' }
@@ -13,7 +13,11 @@ export default async function AnalyseServicesPage() {
   } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const [tickets, poire] = await Promise.all([getAllTicketMetrics(), getAllPoire()])
+  const [tickets, poire, labor] = await Promise.all([
+    getAllTicketMetrics(),
+    getAllPoire(),
+    getAllLabor(),
+  ])
 
   if (tickets.length === 0) {
     return (
@@ -46,5 +50,5 @@ export default async function AnalyseServicesPage() {
     )
   }
 
-  return <Dashboard tickets={tickets} poire={poire} />
+  return <Dashboard tickets={tickets} poire={poire} labor={labor} />
 }
