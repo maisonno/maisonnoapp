@@ -9,7 +9,10 @@ import {
   grandTotal,
   hasPoire,
   mergeRes,
+  monthlyPivot,
   yearStats,
+  type MonthCell,
+  type MonthlyPivot,
   type RestoCell,
   type SvcCell,
 } from '../lib/analytics'
@@ -56,6 +59,16 @@ export default function Dashboard({ tickets, poire }: Props) {
   const tot = mergeRes(C.R)
   const grand = grandTotal(C)
   const baseUp = base.toUpperCase()
+
+  // Ratios par jour ouvert (jours pondérés : 0,25 midi / 0,75 soir)
+  const caPerDay = C.openDays ? grand / C.openDays : null
+  const covPerDay = C.openDays ? C.couverts / C.openDays : null
+
+  const pivot = useMemo(
+    () => monthlyPivot(tickets, poireMap, ctrl),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [tickets, poireMap, cutoff, base, incPoire],
+  )
 
   return (
     <div className="wrap">
@@ -153,6 +166,35 @@ export default function Dashboard({ tickets, poire }: Props) {
         </div>
       </section>
 
+      {/* Jours d'ouverture */}
+      <section>
+        <div className="h2">Jours d&apos;ouverture</div>
+        <div className="kpis">
+          <div className="kpi">
+            <div className="l">Jours ouverts</div>
+            <div className="v">{N1(C.openDays)}</div>
+            <div className="sub">
+              {C.nDays} jour{C.nDays > 1 ? 's' : ''} d&apos;activité · midi 0,25 + soir 0,75 (service ouvert si ≥
+              5 tickets)
+            </div>
+          </div>
+          <div className="kpi">
+            <div className="l">CA moyen / jour ouvert</div>
+            <div className="v">{caPerDay != null ? EUR(caPerDay) : '—'}</div>
+            <div className="sub">
+              {EUR(grand)} {baseUp} / {N1(C.openDays)} j
+            </div>
+          </div>
+          <div className="kpi">
+            <div className="l">Couverts / jour ouvert</div>
+            <div className="v">{covPerDay != null ? N1(covPerDay) : '—'}</div>
+            <div className="sub">
+              {INT(C.couverts)} couv. / {N1(C.openDays)} j
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* KPIs restaurant */}
       <section>
         <div className="h2">Tickets restaurant — indicateurs salle</div>
@@ -175,6 +217,9 @@ export default function Dashboard({ tickets, poire }: Props) {
 
       {/* Comparaison annuelle */}
       <Comparison tickets={tickets} poireMap={poireMap} ctrl={ctrl} hasP={hasP} />
+
+      {/* Tableau par mois */}
+      <Monthly pivot={pivot} baseUp={baseUp} />
 
       {/* Jour par jour */}
       <section>
@@ -478,6 +523,146 @@ function Comparison({
   )
 }
 
+// ─── Tableau par mois ───
+
+const MONTH_LABELS = [
+  'janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin',
+  'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.',
+]
+
+type Indic = {
+  key: string
+  label: string
+  value: (c: MonthCell) => number | null
+  fmt: (v: number) => string
+}
+
+const INDICS: Indic[] = [
+  { key: 'caTotal', label: 'CA total', value: (c) => c.caTotal, fmt: EUR },
+  { key: 'caResto', label: 'CA resto', value: (c) => c.caResto, fmt: EUR },
+  { key: 'caBar', label: 'CA bar', value: (c) => c.caBar, fmt: EUR },
+  { key: 'couverts', label: 'Nb couverts', value: (c) => c.couverts, fmt: INT },
+  { key: 'nTickets', label: 'Nb tickets', value: (c) => c.nTickets, fmt: INT },
+  {
+    key: 'caPerDay',
+    label: 'CA moyen / jour ouvert',
+    value: (c) => (c.openDays ? c.caTotal / c.openDays : null),
+    fmt: EUR,
+  },
+  {
+    key: 'covPerDay',
+    label: 'Couverts / jour ouvert',
+    value: (c) => (c.openDays ? c.couverts / c.openDays : null),
+    fmt: N1,
+  },
+  {
+    key: 'pctDess',
+    label: '% desserts',
+    value: (c) => (c.couverts ? (100 * c.nDessert) / c.couverts : null),
+    fmt: PCT,
+  },
+  {
+    key: 'pctEnt',
+    label: '% entrées',
+    value: (c) => (c.couverts ? (100 * c.nEntree) / c.couverts : null),
+    fmt: PCT,
+  },
+]
+
+function sumCells(cells: MonthCell[]): MonthCell {
+  return cells.reduce<MonthCell>(
+    (a, c) => ({
+      caTotal: a.caTotal + c.caTotal,
+      caResto: a.caResto + c.caResto,
+      caBar: a.caBar + c.caBar,
+      couverts: a.couverts + c.couverts,
+      nTickets: a.nTickets + c.nTickets,
+      openDays: a.openDays + c.openDays,
+      nDessert: a.nDessert + c.nDessert,
+      nEntree: a.nEntree + c.nEntree,
+    }),
+    { caTotal: 0, caResto: 0, caBar: 0, couverts: 0, nTickets: 0, openDays: 0, nDessert: 0, nEntree: 0 },
+  )
+}
+
+function Monthly({ pivot, baseUp }: { pivot: MonthlyPivot; baseUp: string }) {
+  const [ind, setInd] = useState('caTotal')
+  const cur = INDICS.find((i) => i.key === ind) ?? INDICS[0]
+  if (pivot.years.length === 0) return null
+
+  const fmt = (v: number | null) => (v == null ? '—' : cur.fmt(v))
+  const cell = (y: string, m: number): MonthCell | undefined => pivot.cells[`${y}-${m}`]
+
+  return (
+    <section>
+      <div className="h2">
+        Par mois <span className="tag">{cur.label}</span>
+      </div>
+      <div className="controls" style={{ marginBottom: 12 }}>
+        <div className="field">
+          <label>Indicateur</label>
+          <select value={ind} onChange={(e) => setInd(e.target.value)}>
+            {INDICS.map((i) => (
+              <option key={i.key} value={i.key}>
+                {i.label}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+      <div className="daily">
+        <table className="day">
+          <thead>
+            <tr>
+              <th>Année</th>
+              {pivot.months.map((m) => (
+                <th key={m}>{MONTH_LABELS[m - 1]}</th>
+              ))}
+              <th>Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            {pivot.years.map((y) => {
+              const yearCells = pivot.months.map((m) => cell(y, m)).filter((c): c is MonthCell => !!c)
+              const yearTot = sumCells(yearCells)
+              return (
+                <tr key={y}>
+                  <td>
+                    <span className="yr">{y}</span>
+                  </td>
+                  {pivot.months.map((m) => {
+                    const c = cell(y, m)
+                    return <td key={m}>{c ? fmt(cur.value(c)) : '—'}</td>
+                  })}
+                  <td>
+                    <b>{fmt(cur.value(yearTot))}</b>
+                  </td>
+                </tr>
+              )
+            })}
+            <tr className="tot">
+              <td>Total</td>
+              {pivot.months.map((m) => {
+                const monthCells = pivot.years
+                  .map((y) => cell(y, m))
+                  .filter((c): c is MonthCell => !!c)
+                return <td key={m}>{fmt(cur.value(sumCells(monthCells)))}</td>
+              })}
+              <td>{fmt(cur.value(sumCells(Object.values(pivot.cells))))}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div className="foot">
+        Une ligne par année, une colonne par mois · base <b>{baseUp}</b>. Indépendant de la plage de dates
+        choisie plus haut (le mois est le regroupement). « CA moyen / jour ouvert » et « Couverts / jour ouvert »
+        utilisent les jours d&apos;ouverture pondérés ; « % desserts / entrées » se basent sur les couverts
+        restaurant.
+      </div>
+    </section>
+  )
+}
+
 // ─── Jour par jour ───
 
 function Daily({
@@ -565,7 +750,7 @@ function Foot({ cutoff, baseUp, hasP }: { cutoff: number; baseUp: string; hasP: 
       classement des tickets ; les tickets 100 % offerts sont ignorés. Le ratio <b>plat/couvert</b> recoupe les
       plats vendus avec les couverts saisis (≈1 = cohérent).{' '}
       {hasP
-        ? 'La Poire (cash comptoir hors caisse) est ajoutée au bar et au total ; non ventilée midi/soir car saisie au jour. En base HT elle est convertie au taux choisi.'
+        ? 'La Poire (cash comptoir hors caisse) est ajoutée au bar et au total ; non ventilée midi/soir car saisie au jour. Non soumise à la TVA, elle affiche le même montant en TTC et en HT.'
         : 'Importe ta caisse Scoubidoo (.csv) ou ton fichier Poire (.xlsx avec colonnes Date + Poire) pour intégrer le cash comptoir.'}{' '}
       Le panier moyen et les taux se basent sur les couverts saisis dans L&apos;Addition.
     </div>

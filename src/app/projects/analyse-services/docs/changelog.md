@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-07-02 — Jours d'ouverture & tableau mensuel
+- **Jours d'ouverture pondérés** : un service (midi/soir) est ouvert un jour donné
+  s'il a ≥ 5 tickets ; midi seul = 0,25 j, soir seul = 0,75 j, les deux = 1 j.
+  Nouveaux KPIs : jours ouverts, CA moyen / jour ouvert, couverts / jour ouvert.
+- **Tableau par mois** : pivot année × mois avec sélecteur d'indicateur (CA total /
+  resto / bar, couverts, tickets, CA & couverts par jour ouvert, % desserts,
+  % entrées). Indépendant de la plage de dates.
+
 ## 2026-07-02 — Corrections post-import
 - **Poire non soumise à la TVA** : son montant est désormais identique en TTC et
   en HT (plus de conversion ÷ TVA) ; sélecteur « TVA Poire » retiré.

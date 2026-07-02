@@ -22,8 +22,9 @@ Usage interne (accès privé maisonnoApp, auth Supabase partagée). Un seul
 établissement pour l'instant.
 
 ## Pages
-- **`/projects/analyse-services`** — tableau de bord (vue d'ensemble, KPIs salle,
-  midi vs soir, répartition du revenu, comparaison annuelle, jour par jour).
+- **`/projects/analyse-services`** — tableau de bord (vue d'ensemble, jours
+  d'ouverture, KPIs salle, midi vs soir, répartition du revenu, comparaison
+  annuelle, tableau par mois, jour par jour).
 - **`/projects/analyse-services/import`** — dépôt multi-fichiers, détection
   automatique du type, barre de progression, journal des imports.
 
@@ -37,5 +38,9 @@ Usage interne (accès privé maisonnoApp, auth Supabase partagée). Un seul
 - **Poire** : cash au jour, ajouté au bar et au total, non ventilé midi/soir ;
   **non soumise à la TVA** → même montant en TTC et en HT.
 - **Comparaison annuelle** : même fenêtre calendaire (MM-JJ) rejouée sur chaque année.
+- **Jours d'ouverture** : par jour, un service (midi/soir) est ouvert s'il a ≥ 5
+  tickets ; midi seul = 0,25 j, soir seul = 0,75 j, les deux = 1 j. Base des ratios
+  CA moyen / couverts moyen par jour ouvert.
+- **Tableau par mois** : année × mois, indicateur au choix (indépendant de la plage).
 
 Voir `architecture.md`, `database.md`, `api.md` pour le détail.

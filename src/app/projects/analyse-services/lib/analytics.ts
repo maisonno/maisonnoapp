@@ -10,6 +10,13 @@ import type { Base, DashControls, PoireDay, TicketMetric, TicketType } from './t
 
 const NIGHT = 5
 
+// Jours d'ouverture : un service (midi ou soir) est « ouvert » un jour donné s'il
+// a au moins OPEN_MIN tickets. Un jour ouvert midi seul compte 0,25, soir seul
+// 0,75, les deux 1. Sert aux ratios CA moyen / couverts moyen par jour ouvert.
+const OPEN_MIN = 5
+const W_MIDI = 0.25
+const W_SOIR = 0.75
+
 export type SvcCell = { n: number; rev: number }
 export type Matrix = Record<TicketType, { Midi: SvcCell; Soir: SvcCell }>
 
@@ -27,7 +34,15 @@ export type RestoCell = {
   boisson: Bucket
   autre: Bucket
 }
-export type DayAgg = { resto: number; dessert: number; bar: number; couverts: number; total: number }
+export type DayAgg = {
+  resto: number
+  dessert: number
+  bar: number
+  couverts: number
+  total: number
+  midiTk: number // nb de tickets midi (pour le calcul jours ouverts)
+  soirTk: number // nb de tickets soir
+}
 
 export type ComputeResult = {
   from: string
@@ -36,7 +51,9 @@ export type ComputeResult = {
   M: Matrix
   R: { Midi: RestoCell; Soir: RestoCell }
   days: Record<string, DayAgg>
-  nDays: number
+  nDays: number // jours calendaires avec activité
+  openDays: number // jours d'ouverture pondérés (0,25 midi / 0,75 soir)
+  couverts: number // couverts resto (total fenêtre)
   poireTTC: number
   poireV: number
 }
@@ -150,15 +167,37 @@ export function compute(
       }
     }
 
-    const d = days[t.jour] || (days[t.jour] = { resto: 0, dessert: 0, bar: 0, couverts: 0, total: 0 })
+    const d =
+      days[t.jour] ||
+      (days[t.jour] = { resto: 0, dessert: 0, bar: 0, couverts: 0, total: 0, midiTk: 0, soirTk: 0 })
     d[t.type] += v
     d.total += v
     if (t.type === 'resto') d.couverts += t.couverts
+    if (svc === 'Midi') d.midiTk++
+    else d.soirTk++
+  }
+
+  let openDays = 0
+  for (const k in days) {
+    const d = days[k]
+    openDays += (d.midiTk >= OPEN_MIN ? W_MIDI : 0) + (d.soirTk >= OPEN_MIN ? W_SOIR : 0)
   }
 
   const poireTTC = poireSum(poire, from, to)
   const poireV = incP(ctrl, poire) ? poireBase(poireTTC) : 0
-  return { from, to, cut, M, R, days, nDays: Object.keys(days).length, poireTTC, poireV }
+  return {
+    from,
+    to,
+    cut,
+    M,
+    R,
+    days,
+    nDays: Object.keys(days).length,
+    openDays,
+    couverts: R.Midi.couverts + R.Soir.couverts,
+    poireTTC,
+    poireV,
+  }
 }
 
 export function mergeRes(a: { Midi: RestoCell; Soir: RestoCell }): RestoCell {
@@ -234,4 +273,98 @@ export function yearStats(
 export function grandTotal(C: ComputeResult): number {
   const types: TicketType[] = ['resto', 'dessert', 'bar']
   return types.reduce((s, k) => s + C.M[k].Midi.rev + C.M[k].Soir.rev, 0) + C.poireV
+}
+
+// ─── Tableau par mois (année × mois) ───
+// Ignore la fenêtre from/to (le mois EST le regroupement) mais respecte
+// cutoff (jours ouverts), base et incPoire. La Poire est ajoutée au bar et au
+// total du mois. % desserts / % entrées calculés sur les couverts resto, comme
+// les KPIs salle.
+
+export type MonthCell = {
+  caTotal: number
+  caResto: number
+  caBar: number
+  couverts: number
+  nTickets: number
+  openDays: number
+  nDessert: number
+  nEntree: number
+}
+
+export type MonthlyPivot = {
+  years: string[]
+  months: number[] // numéros de mois présents (1-12), triés
+  cells: Record<string, MonthCell> // clé `${year}-${month}`
+}
+
+const mKey = (y: string, m: number) => `${y}-${m}`
+
+const blankMonth = (): MonthCell => ({
+  caTotal: 0,
+  caResto: 0,
+  caBar: 0,
+  couverts: 0,
+  nTickets: 0,
+  openDays: 0,
+  nDessert: 0,
+  nEntree: 0,
+})
+
+export function monthlyPivot(
+  tickets: TicketMetric[],
+  poire: Record<string, number>,
+  ctrl: DashControls,
+): MonthlyPivot {
+  const cells: Record<string, MonthCell> = {}
+  const ensure = (y: string, m: number) => (cells[mKey(y, m)] ||= blankMonth())
+
+  // Comptage des tickets midi/soir par jour (pour les jours ouverts par mois)
+  const dayCount: Record<string, { midi: number; soir: number; ym: string }> = {}
+
+  for (const t of tickets) {
+    const y = t.jour.slice(0, 4)
+    const m = parseInt(t.jour.slice(5, 7), 10)
+    const c = ensure(y, m)
+    const v = ticketVal(t, ctrl.base)
+    c.caTotal += v
+    c.nTickets++
+    if (t.type === 'resto') {
+      c.caResto += v
+      c.couverts += t.couverts
+      c.nDessert += t.n_dessert
+      c.nEntree += t.n_entree
+    } else if (t.type === 'bar') {
+      c.caBar += v
+    }
+    const h = t.heure == null ? ctrl.cutoff : t.heure
+    const soir = h >= ctrl.cutoff || h < NIGHT
+    const dc = dayCount[t.jour] || (dayCount[t.jour] = { midi: 0, soir: 0, ym: mKey(y, m) })
+    if (soir) dc.soir++
+    else dc.midi++
+  }
+
+  // Poire : ajoutée au bar et au total du mois (si incluse)
+  if (incP(ctrl, poire)) {
+    for (const d in poire) {
+      const y = d.slice(0, 4)
+      const m = parseInt(d.slice(5, 7), 10)
+      const c = ensure(y, m)
+      c.caTotal += poire[d]
+      c.caBar += poire[d]
+    }
+  }
+
+  // Jours ouverts pondérés par mois
+  for (const dk in dayCount) {
+    const dc = dayCount[dk]
+    cells[dc.ym].openDays +=
+      (dc.midi >= OPEN_MIN ? W_MIDI : 0) + (dc.soir >= OPEN_MIN ? W_SOIR : 0)
+  }
+
+  const years = [...new Set(Object.keys(cells).map((k) => k.split('-')[0]))].sort()
+  const months = [...new Set(Object.keys(cells).map((k) => parseInt(k.split('-')[1], 10)))].sort(
+    (a, b) => a - b,
+  )
+  return { years, months, cells }
 }
