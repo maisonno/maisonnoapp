@@ -13,11 +13,6 @@ export default async function AnalyseServicesPage() {
   } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  // Diagnostic: test direct access to the view
-  const { count: viewCount, error: viewError } = await supabase
-    .from('ana_v_ticket_metrics')
-    .select('*', { count: 'exact', head: true })
-
   const [tickets, poire] = await Promise.all([getAllTicketMetrics(), getAllPoire()])
 
   if (tickets.length === 0) {
@@ -41,16 +36,6 @@ export default async function AnalyseServicesPage() {
         </header>
         <div className="empty">
           <p>Aucune donnée pour l&apos;instant.</p>
-          {viewError && (
-            <p style={{ marginTop: 8, color: 'red', fontSize: 13, fontFamily: 'monospace' }}>
-              Erreur vue : [{viewError.code}] {viewError.message}
-            </p>
-          )}
-          {!viewError && (
-            <p style={{ marginTop: 8, fontSize: 13, color: '#888' }}>
-              Vue accessible ({viewCount ?? 0} lignes), getAllTicketMetrics retourne [].
-            </p>
-          )}
           <p style={{ marginTop: 12 }}>
             <Link className="btn btn-primary" href="/projects/analyse-services/import">
               ↑ Importer des exports L&apos;Addition

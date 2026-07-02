@@ -108,7 +108,13 @@ $$;
 -- ana_category_map (au lieu d'appeler ana_f_bucket ~15x par ligne, ce qui
 -- déclenchait un statement_timeout côté PostgREST/authenticated). Sémantique
 -- identique : coalesce(map, rattrapage par nom).
-create or replace view ana_v_ticket_metrics as
+--
+-- Vue MATÉRIALISÉE : le résultat est précalculé et stocké. Le tableau de bord
+-- pagine 24 fois (~23k tickets / 1000) — sans matérialisation, chaque page
+-- recalculait tout depuis les 99k lignes (très lent). Ici chaque page est une
+-- simple lecture indexée. On rafraîchit via ana_refresh_metrics() après import.
+drop view if exists ana_v_ticket_metrics;
+create materialized view ana_v_ticket_metrics as
 with lb as (
   select
     l.ticket_id, l.qte, l.prix_ht, l.taux, l.offert,
@@ -163,6 +169,19 @@ from ana_tickets t
 join agg a on a.ticket_id = t.ticket_id
 where (a.ttc > 0 or a.n_plat>0 or a.n_entree>0 or a.n_dessert>0 or a.n_boisson>0); -- exclut les 100% offerts
 
+-- Index : unique sur ticket_id (requis par REFRESH ... CONCURRENTLY) + jour (tri).
+create unique index if not exists idx_ana_vtm_ticket on ana_v_ticket_metrics (ticket_id);
+create index        if not exists idx_ana_vtm_jour   on ana_v_ticket_metrics (jour);
+
+-- Rafraîchissement appelé par le client après import (SECURITY DEFINER car
+-- REFRESH exige d'être propriétaire de la vue matérialisée).
+create or replace function ana_refresh_metrics()
+returns void language plpgsql security definer set search_path = public as $$
+begin
+  refresh materialized view concurrently ana_v_ticket_metrics;
+end;
+$$;
+
 -- -------------------------------------------------------------
 -- RLS : lecture/écriture réservées aux utilisateurs authentifiés
 -- -------------------------------------------------------------
@@ -194,6 +213,7 @@ grant select, insert, update, delete on table ana_poire_daily  to authenticated;
 grant select, insert, update, delete on table ana_import_log   to authenticated;
 grant select, insert, update, delete on table ana_category_map to authenticated;
 grant select on ana_v_ticket_metrics to authenticated;
+grant execute on function ana_refresh_metrics() to authenticated;
 
 -- -------------------------------------------------------------
 -- Référencement dans le dashboard maisonnoApp
