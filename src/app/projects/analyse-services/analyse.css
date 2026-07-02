@@ -676,6 +676,10 @@
   color: var(--poire);
   font-weight: 600;
 }
+.ana-scope table.day td.labor {
+  color: var(--dessert);
+  font-weight: 600;
+}
 
 /* Footer + erreurs */
 .ana-scope .foot {

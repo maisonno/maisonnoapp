@@ -8,8 +8,13 @@
   1er mai, congés payés). Dédoublonnage par (période, hash).
 - Import : détection auto de l'export Combo, période dérivée des dates EVP (repli
   nom de fichier), upserts idempotents.
-- ⏳ À venir : affichage du coût brut/chargé et du % masse salariale / CA (règle de
-  calcul du brut à valider — heures supp, 6ème jour, congés payés).
+- **Affichage** : section « Coûts salariaux » (coût brut/chargé période, % masse
+  salariale / CA, coût chargé / jour ouvert, tableau par mois) + colonne masse
+  salariale au jour par jour. Taux de charges patronales éditable (défaut 42 %).
+- **Estimation du brut** (règles validées) : salaire de base + heures supp hors
+  contrat (×1,10/1,20/1,50) + fériés & 1er mai (+100 %) + 6ème jour (base ÷ 6,
+  « 6 jours payés 7 ») + provision congés payés +10 % ; pas de majoration de nuit
+  (CHR). Le coût mensuel est réparti sur les jours d'ouverture du mois.
 
 ## 2026-07-02 — Jours d'ouverture & tableau mensuel
 - **Jours d'ouverture pondérés** : un service (midi/soir) est ouvert un jour donné
