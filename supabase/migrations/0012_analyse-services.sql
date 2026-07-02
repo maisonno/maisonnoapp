@@ -104,32 +104,49 @@ $$;
 -- exclut les tickets 100 % offerts. Source de vérité du calcul.
 -- -------------------------------------------------------------
 
+-- Perf : on calcule le bucket UNE fois par ligne via un LEFT JOIN sur
+-- ana_category_map (au lieu d'appeler ana_f_bucket ~15x par ligne, ce qui
+-- déclenchait un statement_timeout côté PostgREST/authenticated). Sémantique
+-- identique : coalesce(map, rattrapage par nom).
 create or replace view ana_v_ticket_metrics as
-with agg as (
+with lb as (
   select
-    l.ticket_id,
-    sum(l.prix_ht)                                              as ht,
-    sum(l.prix_ht * (1 + l.taux))                              as ttc,
-    sum(case when ana_f_bucket(l.categorie,l.nom)='entree'  then l.qte else 0 end) as n_entree,
-    sum(case when ana_f_bucket(l.categorie,l.nom)='plat'    then l.qte else 0 end) as n_plat,
-    sum(case when ana_f_bucket(l.categorie,l.nom)='dessert' then l.qte else 0 end) as n_dessert,
-    sum(case when ana_f_bucket(l.categorie,l.nom)='boisson' then l.qte else 0 end) as n_boisson,
-    sum(case when ana_f_bucket(l.categorie,l.nom)='entree'  then l.prix_ht*(1+l.taux) else 0 end) as ttc_entree,
-    sum(case when ana_f_bucket(l.categorie,l.nom)='plat'    then l.prix_ht*(1+l.taux) else 0 end) as ttc_plat,
-    sum(case when ana_f_bucket(l.categorie,l.nom)='dessert' then l.prix_ht*(1+l.taux) else 0 end) as ttc_dessert,
-    sum(case when ana_f_bucket(l.categorie,l.nom)='boisson' then l.prix_ht*(1+l.taux) else 0 end) as ttc_boisson,
-    sum(case when ana_f_bucket(l.categorie,l.nom)='autre'   then l.prix_ht*(1+l.taux) else 0 end) as ttc_autre,
-    sum(case when ana_f_bucket(l.categorie,l.nom)='entree'  then l.prix_ht else 0 end) as ht_entree,
-    sum(case when ana_f_bucket(l.categorie,l.nom)='plat'    then l.prix_ht else 0 end) as ht_plat,
-    sum(case when ana_f_bucket(l.categorie,l.nom)='dessert' then l.prix_ht else 0 end) as ht_dessert,
-    sum(case when ana_f_bucket(l.categorie,l.nom)='boisson' then l.prix_ht else 0 end) as ht_boisson,
-    sum(case when ana_f_bucket(l.categorie,l.nom)='autre'   then l.prix_ht else 0 end) as ht_autre,
-    -- plats offerts (exclus du chiffre mais comptés pour info)
-    (select coalesce(sum(l2.qte),0) from ana_lines l2
-       where l2.ticket_id=l.ticket_id and l2.offert and ana_f_bucket(l2.categorie,l2.nom)='plat') as n_plat_offert
+    l.ticket_id, l.qte, l.prix_ht, l.taux, l.offert,
+    coalesce(
+      cm.bucket,
+      case
+        when lower(coalesce(l.nom,'')) ~ '(plat|frite)'      then 'plat'
+        when lower(coalesce(l.nom,'')) ~ 'affogato'          then 'dessert'
+        when lower(coalesce(l.nom,'')) ~ '(alcool|soft|vin)' then 'boisson'
+        else 'autre'
+      end
+    ) as bucket
   from ana_lines l
-  where l.offert = false
-  group by l.ticket_id
+  left join ana_category_map cm on cm.categorie = l.categorie
+),
+agg as (
+  select
+    ticket_id,
+    coalesce(sum(prix_ht)          filter (where not offert), 0) as ht,
+    coalesce(sum(prix_ht*(1+taux)) filter (where not offert), 0) as ttc,
+    coalesce(sum(qte) filter (where not offert and bucket='entree'),  0) as n_entree,
+    coalesce(sum(qte) filter (where not offert and bucket='plat'),    0) as n_plat,
+    coalesce(sum(qte) filter (where not offert and bucket='dessert'), 0) as n_dessert,
+    coalesce(sum(qte) filter (where not offert and bucket='boisson'), 0) as n_boisson,
+    coalesce(sum(prix_ht*(1+taux)) filter (where not offert and bucket='entree'),  0) as ttc_entree,
+    coalesce(sum(prix_ht*(1+taux)) filter (where not offert and bucket='plat'),    0) as ttc_plat,
+    coalesce(sum(prix_ht*(1+taux)) filter (where not offert and bucket='dessert'), 0) as ttc_dessert,
+    coalesce(sum(prix_ht*(1+taux)) filter (where not offert and bucket='boisson'), 0) as ttc_boisson,
+    coalesce(sum(prix_ht*(1+taux)) filter (where not offert and bucket='autre'),   0) as ttc_autre,
+    coalesce(sum(prix_ht) filter (where not offert and bucket='entree'),  0) as ht_entree,
+    coalesce(sum(prix_ht) filter (where not offert and bucket='plat'),    0) as ht_plat,
+    coalesce(sum(prix_ht) filter (where not offert and bucket='dessert'), 0) as ht_dessert,
+    coalesce(sum(prix_ht) filter (where not offert and bucket='boisson'), 0) as ht_boisson,
+    coalesce(sum(prix_ht) filter (where not offert and bucket='autre'),   0) as ht_autre,
+    coalesce(sum(qte) filter (where offert and bucket='plat'), 0) as n_plat_offert
+  from lb
+  group by ticket_id
+  having count(*) filter (where not offert) > 0   -- au moins une ligne non offerte
 )
 select
   t.ticket_id, t.jour, t.heure, t.couverts,
