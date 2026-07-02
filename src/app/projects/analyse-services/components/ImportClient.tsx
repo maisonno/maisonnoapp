@@ -53,6 +53,7 @@ export default function ImportClient() {
     setBusy(true)
     const files = [...fileList]
     const acc: FileResult[] = [...results]
+    let touched = false
 
     for (const f of files) {
       try {
@@ -61,6 +62,7 @@ export default function ImportClient() {
           const { poire, rowsIn } = parsePoireRows(csvToRows(text), f.name)
           await importPoire(poire, f.name, rowsIn)
           acc.push({ name: f.name, kind: 'poire', info: poireInfo(poire) })
+          touched = true
         } else {
           const buf = await f.arrayBuffer()
           const wb = XLSX.read(buf, { type: 'array', cellDates: true })
@@ -73,10 +75,12 @@ export default function ImportClient() {
               kind: 'ventes',
               info: `${tickets.length.toLocaleString('fr-FR')} tickets · ${lines.length.toLocaleString('fr-FR')} lignes`,
             })
+            touched = true
           } else if (kind === 'poire') {
             const { poire, rowsIn } = parsePoireWorkbook(wb, f.name)
             await importPoire(poire, f.name, rowsIn)
             acc.push({ name: f.name, kind: 'poire', info: poireInfo(poire) })
+            touched = true
           } else {
             throw new Error(
               'ni un export L’Addition (feuilles SalesDocumentLines + SalesDocument), ni un fichier Poire (colonne « Poire » + une date).',
@@ -87,6 +91,14 @@ export default function ImportClient() {
         acc.push({ name: f.name, kind: 'error', info: (err as Error).message })
       }
       setResults([...acc])
+    }
+
+    // Recalcule la vue matérialisée des métriques (sinon les nouvelles
+    // données n'apparaissent pas au tableau de bord).
+    if (touched) {
+      setProgress({ label: 'Mise à jour des statistiques…', pct: 100 })
+      const { error: e } = await supabase.rpc('ana_refresh_metrics')
+      if (e) setError(`Import écrit, mais le recalcul des statistiques a échoué : ${e.message}`)
     }
 
     setProgress(null)
