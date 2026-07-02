@@ -71,9 +71,9 @@ export default function Dashboard({ tickets, poire, labor }: Props) {
   const covPerDay = C.openDays ? C.couverts / C.openDays : null
 
   const pivot = useMemo(
-    () => monthlyPivot(tickets, poireMap, ctrl),
+    () => monthlyPivot(tickets, poireMap, labor, ctrl),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [tickets, poireMap, cutoff, base, incPoire],
+    [tickets, poireMap, labor, cutoff, base, incPoire],
   )
 
   // Coûts salariaux : brut estimé par mois + jours ouverts par mois (mois entier)
@@ -247,7 +247,7 @@ export default function Dashboard({ tickets, poire, labor }: Props) {
       <Comparison tickets={tickets} poireMap={poireMap} ctrl={ctrl} hasP={hasP} />
 
       {/* Tableau par mois */}
-      <Monthly pivot={pivot} baseUp={baseUp} />
+      <Monthly pivot={pivot} baseUp={baseUp} chargeRate={chargeRate} hasLab={hasLab} />
 
       {/* Coûts salariaux */}
       {hasLab && (
@@ -580,38 +580,6 @@ type Indic = {
   fmt: (v: number) => string
 }
 
-const INDICS: Indic[] = [
-  { key: 'caTotal', label: 'CA total', value: (c) => c.caTotal, fmt: EUR },
-  { key: 'caResto', label: 'CA resto', value: (c) => c.caResto, fmt: EUR },
-  { key: 'caBar', label: 'CA bar', value: (c) => c.caBar, fmt: EUR },
-  { key: 'couverts', label: 'Nb couverts', value: (c) => c.couverts, fmt: INT },
-  { key: 'nTickets', label: 'Nb tickets', value: (c) => c.nTickets, fmt: INT },
-  {
-    key: 'caPerDay',
-    label: 'CA moyen / jour ouvert',
-    value: (c) => (c.openDays ? c.caTotal / c.openDays : null),
-    fmt: EUR,
-  },
-  {
-    key: 'covPerDay',
-    label: 'Couverts / jour ouvert',
-    value: (c) => (c.openDays ? c.couverts / c.openDays : null),
-    fmt: N1,
-  },
-  {
-    key: 'pctDess',
-    label: '% desserts',
-    value: (c) => (c.couverts ? (100 * c.nDessert) / c.couverts : null),
-    fmt: PCT,
-  },
-  {
-    key: 'pctEnt',
-    label: '% entrées',
-    value: (c) => (c.couverts ? (100 * c.nEntree) / c.couverts : null),
-    fmt: PCT,
-  },
-]
-
 function sumCells(cells: MonthCell[]): MonthCell {
   return cells.reduce<MonthCell>(
     (a, c) => ({
@@ -623,12 +591,74 @@ function sumCells(cells: MonthCell[]): MonthCell {
       openDays: a.openDays + c.openDays,
       nDessert: a.nDessert + c.nDessert,
       nEntree: a.nEntree + c.nEntree,
+      heures: a.heures + c.heures,
+      brut: a.brut + c.brut,
     }),
-    { caTotal: 0, caResto: 0, caBar: 0, couverts: 0, nTickets: 0, openDays: 0, nDessert: 0, nEntree: 0 },
+    {
+      caTotal: 0, caResto: 0, caBar: 0, couverts: 0, nTickets: 0,
+      openDays: 0, nDessert: 0, nEntree: 0, heures: 0, brut: 0,
+    },
   )
 }
 
-function Monthly({ pivot, baseUp }: { pivot: MonthlyPivot; baseUp: string }) {
+function Monthly({
+  pivot,
+  baseUp,
+  chargeRate,
+  hasLab,
+}: {
+  pivot: MonthlyPivot
+  baseUp: string
+  chargeRate: number
+  hasLab: boolean
+}) {
+  const INDICS: Indic[] = [
+    { key: 'caTotal', label: 'CA total', value: (c) => c.caTotal, fmt: EUR },
+    { key: 'caResto', label: 'CA resto', value: (c) => c.caResto, fmt: EUR },
+    { key: 'caBar', label: 'CA bar', value: (c) => c.caBar, fmt: EUR },
+    { key: 'couverts', label: 'Nb couverts', value: (c) => c.couverts, fmt: INT },
+    { key: 'nTickets', label: 'Nb tickets', value: (c) => c.nTickets, fmt: INT },
+    {
+      key: 'caPerDay',
+      label: 'CA moyen / jour ouvert',
+      value: (c) => (c.openDays ? c.caTotal / c.openDays : null),
+      fmt: EUR,
+    },
+    {
+      key: 'covPerDay',
+      label: 'Couverts / jour ouvert',
+      value: (c) => (c.openDays ? c.couverts / c.openDays : null),
+      fmt: N1,
+    },
+    {
+      key: 'pctDess',
+      label: '% desserts',
+      value: (c) => (c.couverts ? (100 * c.nDessert) / c.couverts : null),
+      fmt: PCT,
+    },
+    {
+      key: 'pctEnt',
+      label: '% entrées',
+      value: (c) => (c.couverts ? (100 * c.nEntree) / c.couverts : null),
+      fmt: PCT,
+    },
+    ...(hasLab
+      ? [
+          {
+            key: 'masse',
+            label: 'Masse salariale (chargée)',
+            value: (c: MonthCell) => (c.brut > 0 ? c.brut * (1 + chargeRate) : null),
+            fmt: EUR,
+          },
+          {
+            key: 'heures',
+            label: 'Heures travaillées',
+            value: (c: MonthCell) => (c.heures > 0 ? c.heures : null),
+            fmt: N1,
+          },
+        ]
+      : []),
+  ]
   const [ind, setInd] = useState('caTotal')
   const cur = INDICS.find((i) => i.key === ind) ?? INDICS[0]
   if (pivot.years.length === 0) return null
