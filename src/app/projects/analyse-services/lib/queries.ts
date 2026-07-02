@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
-import type { PoireDay, TicketMetric } from './types'
+import type { LaborRow, PoireDay, TicketMetric } from './types'
 
 const PAGE = 1000 // PostgREST limite à 1000 lignes/requête → pagination
 
@@ -49,6 +49,22 @@ export async function getAllPoire(): Promise<PoireDay[]> {
     if (data.length < PAGE) break
   }
   return all
+}
+
+export async function getAllLabor(): Promise<LaborRow[]> {
+  const supabase = await createClient()
+  const { data, error } = await supabase
+    .from('ana_labor')
+    .select(
+      'periode,poste,contrat,salaire_base,heures_contrat_mensuel,heures_travaillees,jours_travailles,' +
+        'h_supp_10,h_supp_20,h_supp_50,h_nuit,h_feries,h_1er_mai,conges_payes_j',
+    )
+    .order('periode', { ascending: true })
+  if (error) {
+    console.error('[ana] getAllLabor error:', error.code, error.message)
+    return []
+  }
+  return (data as unknown as LaborRow[]) ?? []
 }
 
 export type ImportLogEntry = {

@@ -177,6 +177,9 @@
 .ana-scope .chip .b.poire {
   background: var(--poire);
 }
+.ana-scope .chip .b.combo {
+  background: var(--dessert);
+}
 .ana-scope .chip .b.error {
   background: var(--resto);
 }

@@ -1,5 +1,16 @@
 # Changelog
 
+## 2026-07-02 — Import masse salariale (Combo)
+- Nouvelle table **`ana_labor`** (migration `0013`) : 1 salarié × 1 mois, issue de
+  l'onglet « Synthèse » de l'export comptable Combo. **Anonymisé** : les noms ne
+  sont jamais stockés (hash Nom+Prénom côté client), on ne garde que poste,
+  contrat, salaire de base et les heures de coût (supp 10/20/50 %, nuit, fériés,
+  1er mai, congés payés). Dédoublonnage par (période, hash).
+- Import : détection auto de l'export Combo, période dérivée des dates EVP (repli
+  nom de fichier), upserts idempotents.
+- ⏳ À venir : affichage du coût brut/chargé et du % masse salariale / CA (règle de
+  calcul du brut à valider — heures supp, 6ème jour, congés payés).
+
 ## 2026-07-02 — Jours d'ouverture & tableau mensuel
 - **Jours d'ouverture pondérés** : un service (midi/soir) est ouvert un jour donné
   s'il a ≥ 5 tickets ; midi seul = 0,25 j, soir seul = 0,75 j, les deux = 1 j.

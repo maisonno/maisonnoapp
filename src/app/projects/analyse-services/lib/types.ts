@@ -35,6 +35,24 @@ export type PoireDay = {
   montant_ttc: number
 }
 
+// Coûts salariaux (ana_labor) — 1 salarié × 1 mois, anonymisé
+export type LaborRow = {
+  periode: string // 'YYYY-MM-DD' (1er du mois)
+  poste: string | null
+  contrat: string | null
+  salaire_base: number
+  heures_contrat_mensuel: number | null
+  heures_travaillees: number | null
+  jours_travailles: number | null
+  h_supp_10: number | null
+  h_supp_20: number | null
+  h_supp_50: number | null
+  h_nuit: number | null
+  h_feries: number | null
+  h_1er_mai: number | null
+  conges_payes_j: number | null
+}
+
 // État des contrôles du tableau de bord
 export type DashControls = {
   from: string
@@ -80,11 +98,31 @@ export type PoireUpsertRow = {
   source_file: string
 }
 
+export type LaborUpsertRow = {
+  periode: string
+  employe_hash: string
+  poste: string | null
+  contrat: string | null
+  salaire_base: number
+  heures_contrat_mensuel: number | null
+  heures_travaillees: number | null
+  jours_travailles: number | null
+  h_supp_10: number | null
+  h_supp_20: number | null
+  h_supp_50: number | null
+  h_nuit: number | null
+  h_feries: number | null
+  h_1er_mai: number | null
+  conges_payes_j: number | null
+  source_file: string
+}
+
 export type ImportLogRow = {
-  kind: 'ventes' | 'poire'
+  kind: 'ventes' | 'poire' | 'combo'
   file_name: string
   rows_in: number
   tickets_upserted: number | null
   lines_upserted: number | null
   poire_upserted: number | null
+  labor_upserted: number | null
 }

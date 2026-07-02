@@ -9,6 +9,7 @@ import { EUR } from '../lib/format'
 import {
   csvToRows,
   detectWorkbookKind,
+  parseComboSynthese,
   parsePoireRows,
   parsePoireWorkbook,
   parseVentes,
@@ -18,7 +19,7 @@ const BATCH = 500
 
 type FileResult = {
   name: string
-  kind: 'ventes' | 'poire' | 'error'
+  kind: 'ventes' | 'poire' | 'combo' | 'error'
   info: string
 }
 
@@ -53,7 +54,8 @@ export default function ImportClient() {
     setBusy(true)
     const files = [...fileList]
     const acc: FileResult[] = [...results]
-    let touched = false
+    let touchedSales = false // ventes → refresh de la vue matérialisée
+    let imported = false // au moins un fichier écrit → router.refresh
 
     for (const f of files) {
       try {
@@ -62,7 +64,7 @@ export default function ImportClient() {
           const { poire, rowsIn } = parsePoireRows(csvToRows(text), f.name)
           await importPoire(poire, f.name, rowsIn)
           acc.push({ name: f.name, kind: 'poire', info: poireInfo(poire) })
-          touched = true
+          imported = true
         } else {
           const buf = await f.arrayBuffer()
           const wb = XLSX.read(buf, { type: 'array', cellDates: true })
@@ -75,15 +77,25 @@ export default function ImportClient() {
               kind: 'ventes',
               info: `${tickets.length.toLocaleString('fr-FR')} tickets · ${lines.length.toLocaleString('fr-FR')} lignes`,
             })
-            touched = true
+            touchedSales = true
+            imported = true
+          } else if (kind === 'combo') {
+            const { labor, periode, rowsIn } = parseComboSynthese(wb, f.name)
+            await importLabor(labor, f.name, rowsIn)
+            acc.push({
+              name: f.name,
+              kind: 'combo',
+              info: `${labor.length} salarié${labor.length > 1 ? 's' : ''} · paie ${periode.slice(0, 7)}`,
+            })
+            imported = true
           } else if (kind === 'poire') {
             const { poire, rowsIn } = parsePoireWorkbook(wb, f.name)
             await importPoire(poire, f.name, rowsIn)
             acc.push({ name: f.name, kind: 'poire', info: poireInfo(poire) })
-            touched = true
+            imported = true
           } else {
             throw new Error(
-              'ni un export L’Addition (feuilles SalesDocumentLines + SalesDocument), ni un fichier Poire (colonne « Poire » + une date).',
+              'type non reconnu : ni export L’Addition (SalesDocumentLines + SalesDocument), ni Poire (colonne « Poire »), ni export comptable Combo (onglet « Synthèse »).',
             )
           }
         }
@@ -93,9 +105,9 @@ export default function ImportClient() {
       setResults([...acc])
     }
 
-    // Recalcule la vue matérialisée des métriques (sinon les nouvelles
-    // données n'apparaissent pas au tableau de bord).
-    if (touched) {
+    // Recalcule la vue matérialisée des métriques (uniquement si des ventes ont
+    // été importées ; Poire et Combo n'affectent pas cette vue).
+    if (touchedSales) {
       setProgress({ label: 'Mise à jour des statistiques…', pct: 100 })
       const { error: e } = await supabase.rpc('ana_refresh_metrics')
       if (e) setError(`Import écrit, mais le recalcul des statistiques a échoué : ${e.message}`)
@@ -104,7 +116,7 @@ export default function ImportClient() {
     setProgress(null)
     setBusy(false)
     if (inputRef.current) inputRef.current.value = ''
-    router.refresh()
+    if (imported) router.refresh()
   }
 
   async function importVentes(
@@ -149,6 +161,23 @@ export default function ImportClient() {
     })
   }
 
+  async function importLabor(
+    labor: Awaited<ReturnType<typeof parseComboSynthese>>['labor'],
+    fname: string,
+    rowsIn: number,
+  ) {
+    const total = labor.length || 1
+    await upsertBatched('ana_labor', labor, 'periode,employe_hash', (p) =>
+      setProgress({ label: `${fname} — écriture des salaires…`, pct: Math.round((100 * p) / total) }),
+    )
+    await supabase.from('ana_import_log').insert({
+      kind: 'combo',
+      file_name: fname,
+      rows_in: rowsIn,
+      labor_upserted: labor.length,
+    })
+  }
+
   const loaded = results.filter((r) => r.kind !== 'error').length
 
   return (
@@ -173,8 +202,8 @@ export default function ImportClient() {
         <div className="txt">
           <b>{busy ? 'Import en cours…' : loaded ? `${loaded} fichier${loaded > 1 ? 's' : ''} importé${loaded > 1 ? 's' : ''}` : 'Dépose tes fichiers ici'}</b>
           <small>
-            exports L’Addition (.xlsx) + Poire (.csv Scoubidoo ou .xlsx) — clique pour choisir. Ré-importer un
-            export déjà chargé ne crée aucun doublon.
+            L’Addition (.xlsx) · Poire (.csv Scoubidoo ou .xlsx) · export comptable Combo (.xlsx, masse
+            salariale) — clique pour choisir. Ré-importer un fichier déjà chargé ne crée aucun doublon.
           </small>
         </div>
         <input
@@ -203,7 +232,13 @@ export default function ImportClient() {
           {results.map((r, i) => (
             <span className="chip" key={i}>
               <span className={`b ${r.kind}`}>
-                {r.kind === 'ventes' ? 'Ventes' : r.kind === 'poire' ? 'Poire' : 'Erreur'}
+                {r.kind === 'ventes'
+                  ? 'Ventes'
+                  : r.kind === 'poire'
+                    ? 'Poire'
+                    : r.kind === 'combo'
+                      ? 'Masse sal.'
+                      : 'Erreur'}
               </span>
               {r.name} <small>· {r.info}</small>
             </span>
