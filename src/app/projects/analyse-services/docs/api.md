@@ -30,7 +30,8 @@ Upserts par lots de 500 via le client browser :
   annuelle pour une fenêtre calendaire.
 - `grandTotal(C)` → total affiché dans la vue d'ensemble.
 
-`ctrl` (`DashControls`) : `{ from, to, cutoff, base ('ttc'|'ht'), incPoire, tvaPoire }`.
+`ctrl` (`DashControls`) : `{ from, to, cutoff, base ('ttc'|'ht'), incPoire }`. La
+Poire est du cash non soumis à la TVA : son montant est identique en TTC et en HT.
 
 ## Parsing — `lib/parsers.ts`
 - `num`, `rate`, `isoDate` : coercition robuste (gère `-`, `%`, séries Excel,

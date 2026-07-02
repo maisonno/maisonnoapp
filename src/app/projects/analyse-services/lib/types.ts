@@ -42,7 +42,6 @@ export type DashControls = {
   cutoff: number // bascule midi/soir (par défaut 17)
   base: Base
   incPoire: boolean
-  tvaPoire: number // 0.10 par défaut
 }
 
 // ─── Lignes prêtes à upsert (import) ───
