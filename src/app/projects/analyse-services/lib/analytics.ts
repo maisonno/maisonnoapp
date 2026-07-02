@@ -82,8 +82,9 @@ export function buildPoireMap(rows: PoireDay[]): Record<string, number> {
 
 export const hasPoire = (poire: Record<string, number>) => Object.keys(poire).length > 0
 
-const poireBase = (ttc: number, base: Base, tvaPoire: number) =>
-  base === 'ht' ? ttc / (1 + tvaPoire) : ttc
+// La Poire est du cash comptoir NON soumis à la TVA : son montant est identique
+// en TTC et en HT (pas de conversion).
+const poireBase = (montant: number) => montant
 
 const incP = (ctrl: DashControls, poire: Record<string, number>) =>
   ctrl.incPoire && hasPoire(poire)
@@ -156,7 +157,7 @@ export function compute(
   }
 
   const poireTTC = poireSum(poire, from, to)
-  const poireV = incP(ctrl, poire) ? poireBase(poireTTC, base, ctrl.tvaPoire) : 0
+  const poireV = incP(ctrl, poire) ? poireBase(poireTTC) : 0
   return { from, to, cut, M, R, days, nDays: Object.keys(days).length, poireTTC, poireV }
 }
 
@@ -213,7 +214,7 @@ export function yearStats(
   for (const d in poire) {
     if (d.startsWith(year) && d.slice(5) >= mdFrom && d.slice(5) <= mdTo) pTTC += poire[d]
   }
-  const pV = incP(ctrl, poire) ? poireBase(pTTC, base, ctrl.tvaPoire) : 0
+  const pV = incP(ctrl, poire) ? poireBase(pTTC) : 0
   return {
     year,
     n: sub.length,

@@ -45,13 +45,12 @@ export default function Dashboard({ tickets, poire }: Props) {
   const [cutoff, setCutoff] = useState(17)
   const [base, setBase] = useState<Base>('ttc')
   const [incPoire, setIncPoire] = useState(true)
-  const [tvaPoire, setTvaPoire] = useState(0.1)
 
-  const ctrl: DashControls = { from, to, cutoff, base, incPoire, tvaPoire }
+  const ctrl: DashControls = { from, to, cutoff, base, incPoire }
   const C = useMemo(
     () => compute(tickets, poireMap, ctrl),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [tickets, poireMap, from, to, cutoff, base, incPoire, tvaPoire],
+    [tickets, poireMap, from, to, cutoff, base, incPoire],
   )
 
   const tot = mergeRes(C.R)
@@ -132,14 +131,6 @@ export default function Dashboard({ tickets, poire }: Props) {
               <input type="checkbox" checked={incPoire} onChange={(e) => setIncPoire(e.target.checked)} />{' '}
               Inclure la Poire
             </label>
-            <div className="field">
-              <label>TVA Poire (pour HT)</label>
-              <select value={tvaPoire} onChange={(e) => setTvaPoire(parseFloat(e.target.value))}>
-                <option value={0.1}>10 %</option>
-                <option value={0.2}>20 %</option>
-                <option value={0}>0 %</option>
-              </select>
-            </div>
           </div>
         )}
         <div className="range-note">
@@ -502,8 +493,8 @@ function Daily({
 }) {
   const ds = Object.keys(C.days).sort()
   const tt = { resto: 0, dessert: 0, bar: 0, couverts: 0, poire: 0, total: 0 }
-  const poireVal = (ttc: number) =>
-    ctrl.incPoire && hasP ? (ctrl.base === 'ht' ? ttc / (1 + ctrl.tvaPoire) : ttc) : 0
+  // Poire = cash non soumis à la TVA → même montant en TTC et HT.
+  const poireVal = (montant: number) => (ctrl.incPoire && hasP ? montant : 0)
 
   const rows = ds.map((d) => {
     const x = C.days[d]

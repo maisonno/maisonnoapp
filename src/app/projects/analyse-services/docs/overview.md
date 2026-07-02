@@ -34,8 +34,8 @@ Usage interne (accès privé maisonnoApp, auth Supabase partagée). Un seul
 - **Type de ticket** : `resto` (≥1 plat ou entrée) · `dessert` (dessert seul) · `bar`.
 - **Service soir = de cutoff (17 h par défaut) à 5 h** : les ardoises fermées après
   minuit comptent dans le soir.
-- **Poire** : cash TTC au jour, ajouté au bar et au total, non ventilé midi/soir ;
-  convertie en HT au taux choisi (10 % par défaut).
+- **Poire** : cash au jour, ajouté au bar et au total, non ventilé midi/soir ;
+  **non soumise à la TVA** → même montant en TTC et en HT.
 - **Comparaison annuelle** : même fenêtre calendaire (MM-JJ) rejouée sur chaque année.
 
 Voir `architecture.md`, `database.md`, `api.md` pour le détail.
