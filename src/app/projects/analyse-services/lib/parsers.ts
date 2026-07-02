@@ -3,7 +3,7 @@
 // du HTML de référence, mais produit des lignes prêtes à upsert en base.
 
 import * as XLSX from 'xlsx'
-import type { LineUpsertRow, PoireUpsertRow, TicketUpsertRow } from './types'
+import type { LaborUpsertRow, LineUpsertRow, PoireUpsertRow, TicketUpsertRow } from './types'
 
 // ─── Coercition robuste ───
 
@@ -61,10 +61,24 @@ export function findCol(row: Row, keys: string[]): string | null {
 
 // ─── Détection du type de fichier ───
 
-export type FileKind = 'ventes' | 'poire' | 'unknown'
+export type FileKind = 'ventes' | 'poire' | 'combo' | 'unknown'
+
+// Repère l'onglet « Synthèse » de l'export comptable Combo (entête « Salaire de base »)
+function comboSyntheseName(wb: XLSX.WorkBook): string | null {
+  for (const sn of wb.SheetNames) {
+    const aoa = XLSX.utils.sheet_to_json<unknown[]>(wb.Sheets[sn], { header: 1, defval: null, raw: true })
+    for (const row of aoa.slice(0, 3)) {
+      if (Array.isArray(row) && row.some((c) => String(c ?? '').toLowerCase().includes('salaire de base'))) {
+        return sn
+      }
+    }
+  }
+  return null
+}
 
 export function detectWorkbookKind(wb: XLSX.WorkBook): FileKind {
   if (wb.Sheets['SalesDocumentLines'] && wb.Sheets['SalesDocument']) return 'ventes'
+  if (comboSyntheseName(wb)) return 'combo'
   for (const sn of wb.SheetNames) {
     const rows = XLSX.utils.sheet_to_json<Row>(wb.Sheets[sn], { defval: null, raw: true })
     if (rows.length && findCol(rows[0], ['poire'])) return 'poire'
@@ -237,4 +251,128 @@ export function parsePoireWorkbook(wb: XLSX.WorkBook, fname: string): PoireParse
     if (rows.length && findCol(rows[0], ['poire'])) return parsePoireRows(rows, fname)
   }
   throw new Error('aucune feuille avec une colonne « Poire »')
+}
+
+// ─── Import Combo (export comptable, onglet « Synthèse ») ───
+
+export type ComboParse = { labor: LaborUpsertRow[]; periode: string; rowsIn: number }
+
+// Hash anonyme stable (FNV-1a 32 bits, hex) — le nom ne quitte jamais le navigateur.
+function anonHash(s: string): string {
+  let h = 0x811c9dc5
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i)
+    h = Math.imul(h, 0x01000193)
+  }
+  return (h >>> 0).toString(16).padStart(8, '0')
+}
+
+// Indice de la 1re colonne dont l'entête contient l'un des mots-clés
+function findIdx(headers: unknown[], keys: string[]): number {
+  for (let i = 0; i < headers.length; i++) {
+    const h = String(headers[i] ?? '').toLowerCase().trim()
+    if (h && keys.some((k) => h === k || h.includes(k))) return i
+  }
+  return -1
+}
+
+// Mois de paie (YYYY-MM) le plus fréquent parmi les dates début/fin des onglets EVP/Absences
+function periodFromDates(wb: XLSX.WorkBook): string | null {
+  const tally: Record<string, number> = {}
+  for (const sn of ['Éléments Variables de Paie', 'Absences']) {
+    const ws = wb.Sheets[sn]
+    if (!ws) continue
+    const aoa = XLSX.utils.sheet_to_json<unknown[]>(ws, { header: 1, defval: null, raw: false })
+    if (!aoa.length) continue
+    const hdr = aoa[0] as unknown[]
+    const di = findIdx(hdr, ['date début', 'date debut'])
+    const fi = findIdx(hdr, ['date fin'])
+    for (const row of aoa.slice(1)) {
+      for (const idx of [di, fi]) {
+        if (idx < 0) continue
+        const iso = isoDate((row as unknown[])[idx])
+        if (iso) tally[iso.slice(0, 7)] = (tally[iso.slice(0, 7)] || 0) + 1
+      }
+    }
+  }
+  const entries = Object.entries(tally)
+  if (!entries.length) return null
+  entries.sort((a, b) => b[1] - a[1])
+  return entries[0][0]
+}
+
+// Repli : période depuis le nom de fichier Combo (« …2026__0105__3105… » → 2026-05)
+function periodFromFilename(fname: string): string | null {
+  const m = fname.match(/(\d{4})\D+(\d{2})(\d{2})\D+(\d{2})(\d{2})/)
+  if (m) return `${m[1]}-${m[3]}` // m[3] = mois du 1er jour (DDMM)
+  return null
+}
+
+export function parseComboSynthese(wb: XLSX.WorkBook, fname: string): ComboParse {
+  const sn = comboSyntheseName(wb)
+  if (!sn) throw new Error('onglet « Synthèse » (colonne « Salaire de base ») introuvable')
+  const aoa = XLSX.utils.sheet_to_json<unknown[]>(wb.Sheets[sn], { header: 1, defval: null, raw: true })
+
+  // La feuille a 2 lignes d'entête (groupes puis colonnes) : on prend celle qui contient « Salaire de base »
+  let hIdx = aoa.findIndex(
+    (r) => Array.isArray(r) && r.some((c) => String(c ?? '').toLowerCase().includes('salaire de base')),
+  )
+  if (hIdx < 0) hIdx = 1
+  const hdr = aoa[hIdx] as unknown[]
+
+  const iNom = findIdx(hdr, ['nom'])
+  const iPrenom = findIdx(hdr, ['prénom', 'prenom'])
+  const iPoste = findIdx(hdr, ['poste'])
+  const iContrat = findIdx(hdr, ['contrat'])
+  const iBase = findIdx(hdr, ['salaire de base'])
+  const iHmois = findIdx(hdr, ['heures contrat mensuel'])
+  const iHtrav = findIdx(hdr, ['heures travaillées', 'heures travaillees'])
+  const iJours = findIdx(hdr, ['total jours travaillés', 'total jours travailles', 'jours travaillés'])
+  const iS10 = findIdx(hdr, ['heures supp. 10.0% (hors contrat)'])
+  const iS20 = findIdx(hdr, ['heures supp. 20.0% (hors contrat)'])
+  const iS50 = findIdx(hdr, ['heures supp. 50.0% (hors contrat)'])
+  const iNuit = findIdx(hdr, ['heures majorées de nuit', 'heures majorees de nuit'])
+  const iFeries = findIdx(hdr, ['majorées (jours fériés)', 'majorees (jours feries)'])
+  const i1Mai = findIdx(hdr, ['heures majorées 1er mai', 'heures majorees 1er mai'])
+  const iCP = findIdx(hdr, ['congé payé', 'conge paye'])
+
+  const orNull = (idx: number, row: unknown[]) => (idx >= 0 ? num(row[idx]) : null)
+
+  const periode = periodFromDates(wb) || periodFromFilename(fname)
+  if (!periode) throw new Error('impossible de déterminer le mois de paie (dates EVP et nom de fichier illisibles)')
+  const periodeDate = `${periode}-01`
+
+  const byHash: Record<string, LaborUpsertRow> = {}
+  let rowsIn = 0
+  for (const row of aoa.slice(hIdx + 1)) {
+    if (!Array.isArray(row)) continue
+    const nom = iNom >= 0 ? String(row[iNom] ?? '').trim() : ''
+    const prenom = iPrenom >= 0 ? String(row[iPrenom] ?? '').trim() : ''
+    // Ignore la ligne « TOTAL » et les lignes sans salaire de base
+    if (!nom || prenom.toUpperCase() === 'TOTAL') continue
+    const base = iBase >= 0 ? num(row[iBase]) : 0
+    if (!base) continue
+    rowsIn++
+    const contrat = iContrat >= 0 && row[iContrat] != null ? String(row[iContrat]).trim() : null
+    const employe_hash = anonHash(`${nom}|${prenom}|${contrat ?? ''}`)
+    byHash[employe_hash] = {
+      periode: periodeDate,
+      employe_hash,
+      poste: iPoste >= 0 && row[iPoste] != null ? String(row[iPoste]).trim() : null,
+      contrat,
+      salaire_base: base,
+      heures_contrat_mensuel: orNull(iHmois, row),
+      heures_travaillees: orNull(iHtrav, row),
+      jours_travailles: orNull(iJours, row),
+      h_supp_10: orNull(iS10, row),
+      h_supp_20: orNull(iS20, row),
+      h_supp_50: orNull(iS50, row),
+      h_nuit: orNull(iNuit, row),
+      h_feries: orNull(iFeries, row),
+      h_1er_mai: orNull(i1Mai, row),
+      conges_payes_j: orNull(iCP, row),
+      source_file: fname,
+    }
+  }
+  return { labor: Object.values(byHash), periode: periodeDate, rowsIn }
 }
