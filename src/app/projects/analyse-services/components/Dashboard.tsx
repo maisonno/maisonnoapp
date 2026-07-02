@@ -665,6 +665,7 @@ function Monthly({
 
   const fmt = (v: number | null) => (v == null ? '—' : cur.fmt(v))
   const cell = (y: string, m: number): MonthCell | undefined => pivot.cells[`${y}-${m}`]
+  const mean = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : null)
 
   return (
     <section>
@@ -714,23 +715,39 @@ function Monthly({
               )
             })}
             <tr className="tot">
-              <td>Total</td>
+              <td>Moyenne</td>
               {pivot.months.map((m) => {
-                const monthCells = pivot.years
-                  .map((y) => cell(y, m))
-                  .filter((c): c is MonthCell => !!c)
-                return <td key={m}>{fmt(cur.value(sumCells(monthCells)))}</td>
+                const vals = pivot.years
+                  .map((y) => {
+                    const c = cell(y, m)
+                    return c ? cur.value(c) : null
+                  })
+                  .filter((v): v is number => v != null)
+                return <td key={m}>{fmt(mean(vals))}</td>
               })}
-              <td>{fmt(cur.value(sumCells(Object.values(pivot.cells))))}</td>
+              <td>
+                {fmt(
+                  mean(
+                    pivot.years
+                      .map((y) => {
+                        const yc = pivot.months
+                          .map((m) => cell(y, m))
+                          .filter((c): c is MonthCell => !!c)
+                        return yc.length ? cur.value(sumCells(yc)) : null
+                      })
+                      .filter((v): v is number => v != null),
+                  ),
+                )}
+              </td>
             </tr>
           </tbody>
         </table>
       </div>
       <div className="foot">
         Une ligne par année, une colonne par mois · base <b>{baseUp}</b>. Indépendant de la plage de dates
-        choisie plus haut (le mois est le regroupement). « CA moyen / jour ouvert » et « Couverts / jour ouvert »
-        utilisent les jours d&apos;ouverture pondérés ; « % desserts / entrées » se basent sur les couverts
-        restaurant.
+        choisie plus haut (le mois est le regroupement). La ligne <b>Moyenne</b> est la moyenne sur les années où
+        le mois a des données (pas une somme). « CA moyen / jour ouvert » et « Couverts / jour ouvert » utilisent
+        les jours d&apos;ouverture pondérés ; « % desserts / entrées » se basent sur les couverts restaurant.
       </div>
     </section>
   )
