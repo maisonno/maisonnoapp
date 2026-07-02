@@ -290,6 +290,8 @@ export type MonthCell = {
   openDays: number
   nDessert: number
   nEntree: number
+  heures: number // heures travaillées (Combo)
+  brut: number // brut salarial estimé, avant charges (Combo)
 }
 
 export type MonthlyPivot = {
@@ -309,11 +311,14 @@ const blankMonth = (): MonthCell => ({
   openDays: 0,
   nDessert: 0,
   nEntree: 0,
+  heures: 0,
+  brut: 0,
 })
 
 export function monthlyPivot(
   tickets: TicketMetric[],
   poire: Record<string, number>,
+  labor: LaborRow[],
   ctrl: DashControls,
 ): MonthlyPivot {
   const cells: Record<string, MonthCell> = {}
@@ -360,6 +365,15 @@ export function monthlyPivot(
     const dc = dayCount[dk]
     cells[dc.ym].openDays +=
       (dc.midi >= OPEN_MIN ? W_MIDI : 0) + (dc.soir >= OPEN_MIN ? W_SOIR : 0)
+  }
+
+  // Masse salariale (Combo) : heures travaillées + brut estimé par mois
+  for (const r of labor) {
+    const y = r.periode.slice(0, 4)
+    const m = parseInt(r.periode.slice(5, 7), 10)
+    const c = ensure(y, m)
+    c.heures += r.heures_travaillees || 0
+    c.brut += estimateBrut(r)
   }
 
   const years = [...new Set(Object.keys(cells).map((k) => k.split('-')[0]))].sort()
