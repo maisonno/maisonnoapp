@@ -53,7 +53,7 @@ export default function Dashboard({ tickets, poire, labor }: Props) {
   const [cutoff, setCutoff] = useState(17)
   const [base, setBase] = useState<Base>('ttc')
   const [incPoire, setIncPoire] = useState(true)
-  const [chargeRate, setChargeRate] = useState(0.42) // charges patronales (éditable)
+  const [chargeRate, setChargeRate] = useState(0.3) // charges patronales (éditable, ~26,8 % réel 2025)
 
   const ctrl: DashControls = { from, to, cutoff, base, incPoire }
   const C = useMemo(
@@ -655,6 +655,13 @@ function Monthly({
             label: 'Heures travaillées',
             value: (c: MonthCell) => (c.heures > 0 ? c.heures : null),
             fmt: N1,
+          },
+          {
+            key: 'pctMasse',
+            label: '% masse salariale / CA',
+            value: (c: MonthCell) =>
+              c.brut > 0 && c.caTotal > 0 ? (100 * c.brut * (1 + chargeRate)) / c.caTotal : null,
+            fmt: PCT,
           },
         ]
       : []),
