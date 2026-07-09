@@ -1,9 +1,10 @@
 # Changelog
 
-## 2026-07-09 — Analyse du ticket moyen
-- Nouveau bloc : distribution des tickets par **tranche de 5 €** (0-5, 5-10, …),
-  une colonne par année, bascule **Nombre de tickets / CA**, + ligne ticket moyen.
-  Calcul 100 % client (aucun SQL).
+## 2026-07-09 — Analyse du panier moyen
+- Nouveau bloc : distribution des tickets **restaurant** par tranche de 5 € de
+  **panier** (montant ÷ couverts), une colonne par année, bascule **Nombre de
+  tickets / CA**, ligne panier moyen (CA ÷ couverts), + **graphique en courbe**
+  (une courbe par année, SVG léger). Calcul 100 % client (aucun SQL).
 
 ## 2026-07-09 — Indicateurs mensuels : paniers midi/soir + pinsa
 - Tableau « Par mois » : ajout de **panier moyen midi**, **panier moyen soir**

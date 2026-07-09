@@ -408,42 +408,48 @@ export function monthlyPivot(
   return { years, months, cells }
 }
 
-// ─── Distribution des tickets par tranche de 5 € (analyse du ticket moyen) ───
-// Répartit chaque ticket RESTAURANT (au moins un plat ou une entrée ; bar et
-// desserts seuls exclus) dans une tranche de 5 € (0-5, 5-10, …), par année.
-// Valeur = ttc ou ht selon la base. Indépendant de la fenêtre de dates.
+// ─── Distribution du panier par tranche de 5 € (analyse du panier moyen) ───
+// Pour chaque ticket RESTAURANT (au moins un plat ou une entrée ; bar et
+// desserts seuls exclus) avec au moins 1 couvert, on calcule le PANIER = valeur
+// du ticket / couverts, et on le range dans une tranche de 5 € (0-5, 5-10, …),
+// par année. « Nb tickets » = tickets rangés dans la tranche ; « CA » = somme du
+// CA de ces tickets. Valeur = ttc ou ht selon la base. Indépendant de la fenêtre.
 
 const BUCKET_EUR = 5
 const NB_BUCKETS = 20 // 0 → 100 € ; l'indice 20 = « 100 €+ »
 
-export type TicketBuckets = {
+export type PanierBuckets = {
   years: string[]
   labels: string[]
   countByYear: Record<string, number[]>
   caByYear: Record<string, number[]>
-  meanByYear: Record<string, number>
+  meanByYear: Record<string, number> // panier moyen = CA / couverts
   totalCountByYear: Record<string, number>
   totalCaByYear: Record<string, number>
 }
 
-export function ticketBuckets(tickets: TicketMetric[], base: Base): TicketBuckets {
-  const resto = tickets.filter((t) => t.type === 'resto')
+export function panierBuckets(tickets: TicketMetric[], base: Base): PanierBuckets {
+  const resto = tickets.filter((t) => t.type === 'resto' && t.couverts > 0)
   const years = [...new Set(resto.map((t) => t.jour.slice(0, 4)))].sort()
   const countByYear: Record<string, number[]> = {}
   const caByYear: Record<string, number[]> = {}
+  const cvByYear: Record<string, number> = {}
   for (const y of years) {
     countByYear[y] = new Array(NB_BUCKETS + 1).fill(0)
     caByYear[y] = new Array(NB_BUCKETS + 1).fill(0)
+    cvByYear[y] = 0
   }
   let maxUsed = 0
   for (const t of resto) {
     const y = t.jour.slice(0, 4)
     const v = ticketVal(t, base)
-    let idx = Math.floor(v / BUCKET_EUR)
+    const panier = v / t.couverts
+    let idx = Math.floor(panier / BUCKET_EUR)
     if (idx < 0) idx = 0
     if (idx > NB_BUCKETS) idx = NB_BUCKETS
     countByYear[y][idx]++
     caByYear[y][idx] += v
+    cvByYear[y] += t.couverts
     if (idx > maxUsed) maxUsed = idx
   }
   const last = Math.min(maxUsed, NB_BUCKETS)
@@ -461,7 +467,7 @@ export function ticketBuckets(tickets: TicketMetric[], base: Base): TicketBucket
     const tca = caByYear[y].reduce((a, b) => a + b, 0)
     totalCountByYear[y] = tc
     totalCaByYear[y] = tca
-    meanByYear[y] = tc ? tca / tc : 0
+    meanByYear[y] = cvByYear[y] ? tca / cvByYear[y] : 0 // panier moyen = CA / couverts
   }
   return { years, labels, countByYear, caByYear, meanByYear, totalCountByYear, totalCaByYear }
 }
