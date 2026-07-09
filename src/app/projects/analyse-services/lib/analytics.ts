@@ -408,6 +408,62 @@ export function monthlyPivot(
   return { years, months, cells }
 }
 
+// ─── Distribution des tickets par tranche de 5 € (analyse du ticket moyen) ───
+// Répartit chaque ticket (valeur = ttc ou ht selon base) dans une tranche de 5 €
+// (0-5, 5-10, …), par année. Indépendant de la fenêtre de dates.
+
+const BUCKET_EUR = 5
+const NB_BUCKETS = 20 // 0 → 100 € ; l'indice 20 = « 100 €+ »
+
+export type TicketBuckets = {
+  years: string[]
+  labels: string[]
+  countByYear: Record<string, number[]>
+  caByYear: Record<string, number[]>
+  meanByYear: Record<string, number>
+  totalCountByYear: Record<string, number>
+  totalCaByYear: Record<string, number>
+}
+
+export function ticketBuckets(tickets: TicketMetric[], base: Base): TicketBuckets {
+  const years = [...new Set(tickets.map((t) => t.jour.slice(0, 4)))].sort()
+  const countByYear: Record<string, number[]> = {}
+  const caByYear: Record<string, number[]> = {}
+  for (const y of years) {
+    countByYear[y] = new Array(NB_BUCKETS + 1).fill(0)
+    caByYear[y] = new Array(NB_BUCKETS + 1).fill(0)
+  }
+  let maxUsed = 0
+  for (const t of tickets) {
+    const y = t.jour.slice(0, 4)
+    const v = ticketVal(t, base)
+    let idx = Math.floor(v / BUCKET_EUR)
+    if (idx < 0) idx = 0
+    if (idx > NB_BUCKETS) idx = NB_BUCKETS
+    countByYear[y][idx]++
+    caByYear[y][idx] += v
+    if (idx > maxUsed) maxUsed = idx
+  }
+  const last = Math.min(maxUsed, NB_BUCKETS)
+  const labels: string[] = []
+  for (let i = 0; i <= last; i++) {
+    labels.push(
+      i >= NB_BUCKETS ? `${NB_BUCKETS * BUCKET_EUR} €+` : `${i * BUCKET_EUR} – ${(i + 1) * BUCKET_EUR}`,
+    )
+  }
+  const meanByYear: Record<string, number> = {}
+  const totalCountByYear: Record<string, number> = {}
+  const totalCaByYear: Record<string, number> = {}
+  for (const y of years) {
+    const tc = countByYear[y].reduce((a, b) => a + b, 0)
+    const tca = caByYear[y].reduce((a, b) => a + b, 0)
+    totalCountByYear[y] = tc
+    totalCaByYear[y] = tca
+    meanByYear[y] = tc ? tca / tc : 0
+  }
+  return { years, labels, countByYear, caByYear, meanByYear, totalCountByYear, totalCaByYear }
+}
+
 // ─── Coûts salariaux (export Combo) ───
 //
 // Estimation enrichie du BRUT mensuel par salarié (règles validées) :

@@ -13,12 +13,14 @@ import {
   laborBrutByMonth,
   mergeRes,
   monthlyPivot,
+  ticketBuckets,
   yearStats,
   type LaborResult,
   type MonthCell,
   type MonthlyPivot,
   type RestoCell,
   type SvcCell,
+  type TicketBuckets,
 } from '../lib/analytics'
 import { EUR, EUR2, INT, N1, PCT, frDMY, frDate, frMD } from '../lib/format'
 
@@ -98,6 +100,8 @@ export default function Dashboard({ tickets, poire, labor, pinsaByMonth }: Props
   }, [pivot])
   const L = computeLabor(C, monthOpenDays, brutByMonth, chargeRate)
   const pctMasse = grand > 0 ? (100 * L.charged) / grand : null
+
+  const tb = useMemo(() => ticketBuckets(tickets, base), [tickets, base])
 
   return (
     <div className="wrap">
@@ -249,6 +253,9 @@ export default function Dashboard({ tickets, poire, labor, pinsaByMonth }: Props
 
       {/* Tableau par mois */}
       <Monthly pivot={pivot} baseUp={baseUp} chargeRate={chargeRate} hasLab={hasLab} />
+
+      {/* Analyse du ticket moyen */}
+      <TicketMoyen tb={tb} baseUp={baseUp} />
 
       {/* Coûts salariaux */}
       {hasLab && (
@@ -780,6 +787,73 @@ function Monthly({
         choisie plus haut (le mois est le regroupement). La ligne <b>Moyenne</b> est la moyenne sur les années où
         le mois a des données (pas une somme). « CA moyen / jour ouvert » et « Couverts / jour ouvert » utilisent
         les jours d&apos;ouverture pondérés ; « % desserts / entrées » se basent sur les couverts restaurant.
+      </div>
+    </section>
+  )
+}
+
+// ─── Analyse du ticket moyen (distribution par tranche de 5 €) ───
+
+function TicketMoyen({ tb, baseUp }: { tb: TicketBuckets; baseUp: string }) {
+  const [metric, setMetric] = useState<'count' | 'ca'>('count')
+  if (tb.years.length === 0) return null
+  const data = metric === 'count' ? tb.countByYear : tb.caByYear
+  const fmtCell = metric === 'count' ? INT : EUR
+  const total = metric === 'count' ? tb.totalCountByYear : tb.totalCaByYear
+
+  return (
+    <section>
+      <div className="h2">
+        Analyse du ticket moyen <span className="tag">par tranche de 5 €</span>
+      </div>
+      <div className="controls" style={{ marginBottom: 12 }}>
+        <div className="field">
+          <label>Mesure</label>
+          <select value={metric} onChange={(e) => setMetric(e.target.value as 'count' | 'ca')}>
+            <option value="count">Nombre de tickets</option>
+            <option value="ca">CA des tickets</option>
+          </select>
+        </div>
+      </div>
+      <div className="daily">
+        <table className="day">
+          <thead>
+            <tr>
+              <th>Tranche (€)</th>
+              {tb.years.map((y) => (
+                <th key={y}>{y}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {tb.labels.map((lbl, i) => (
+              <tr key={lbl}>
+                <td>{lbl}</td>
+                {tb.years.map((y) => (
+                  <td key={y}>{fmtCell(data[y][i])}</td>
+                ))}
+              </tr>
+            ))}
+            <tr className="tot">
+              <td>Total</td>
+              {tb.years.map((y) => (
+                <td key={y}>{fmtCell(total[y])}</td>
+              ))}
+            </tr>
+            <tr className="tot">
+              <td>Ticket moyen</td>
+              {tb.years.map((y) => (
+                <td key={y}>{EUR2(tb.meanByYear[y])}</td>
+              ))}
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div className="foot">
+        Répartition de <b>tous les tickets</b> (resto, desserts, bar) par tranche de 5 € de leur montant{' '}
+        <b>{baseUp}</b>, une colonne par année. Indépendant de la plage de dates. Bascule « Nombre de tickets / CA
+        des tickets » ci-dessus ; dernière ligne = ticket moyen de l&apos;année (CA ÷ nombre de tickets). La Poire
+        (cash au jour, non ticketée) n&apos;est pas comptée ici.
       </div>
     </section>
   )
