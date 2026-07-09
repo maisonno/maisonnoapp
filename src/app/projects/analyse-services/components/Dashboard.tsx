@@ -13,14 +13,14 @@ import {
   laborBrutByMonth,
   mergeRes,
   monthlyPivot,
-  ticketBuckets,
+  panierBuckets,
   yearStats,
   type LaborResult,
   type MonthCell,
   type MonthlyPivot,
+  type PanierBuckets,
   type RestoCell,
   type SvcCell,
-  type TicketBuckets,
 } from '../lib/analytics'
 import { EUR, EUR2, INT, N1, PCT, frDMY, frDate, frMD } from '../lib/format'
 
@@ -101,7 +101,7 @@ export default function Dashboard({ tickets, poire, labor, pinsaByMonth }: Props
   const L = computeLabor(C, monthOpenDays, brutByMonth, chargeRate)
   const pctMasse = grand > 0 ? (100 * L.charged) / grand : null
 
-  const tb = useMemo(() => ticketBuckets(tickets, base), [tickets, base])
+  const pb = useMemo(() => panierBuckets(tickets, base), [tickets, base])
 
   return (
     <div className="wrap">
@@ -254,8 +254,8 @@ export default function Dashboard({ tickets, poire, labor, pinsaByMonth }: Props
       {/* Tableau par mois */}
       <Monthly pivot={pivot} baseUp={baseUp} chargeRate={chargeRate} hasLab={hasLab} />
 
-      {/* Analyse du ticket moyen */}
-      <TicketMoyen tb={tb} baseUp={baseUp} />
+      {/* Analyse du panier moyen */}
+      <PanierMoyen pb={pb} baseUp={baseUp} />
 
       {/* Coûts salariaux */}
       {hasLab && (
@@ -792,19 +792,100 @@ function Monthly({
   )
 }
 
-// ─── Analyse du ticket moyen (distribution par tranche de 5 €) ───
+// ─── Analyse du panier moyen (distribution par tranche de 5 €) ───
 
-function TicketMoyen({ tb, baseUp }: { tb: TicketBuckets; baseUp: string }) {
+const YEAR_COLORS = ['#C8443B', '#1E6FA8', '#D99A28', '#7A9A3C', '#4E8C6A', '#8E5BA6']
+
+function LineChart({
+  labels,
+  series,
+}: {
+  labels: string[]
+  series: { name: string; color: string; values: number[] }[]
+}) {
+  const W = 680
+  const H = 220
+  const padL = 48
+  const padR = 12
+  const padT = 12
+  const padB = 30
+  const n = labels.length
+  const maxV = Math.max(1, ...series.flatMap((s) => s.values))
+  const x = (i: number) => padL + (n <= 1 ? 0 : (i * (W - padL - padR)) / (n - 1))
+  const y = (v: number) => padT + (H - padT - padB) * (1 - v / maxV)
+  const ticks = 4
+  const step = Math.max(1, Math.ceil(n / 8)) // espacer les libellés X
+
+  return (
+    <div style={{ overflowX: 'auto' }}>
+      <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', minWidth: 480, height: 'auto' }} role="img">
+        {Array.from({ length: ticks + 1 }, (_, k) => {
+          const v = (maxV * k) / ticks
+          const yy = y(v)
+          return (
+            <g key={k}>
+              <line x1={padL} y1={yy} x2={W - padR} y2={yy} stroke="var(--line)" strokeWidth="1" />
+              <text x={padL - 6} y={yy + 3} textAnchor="end" fontSize="10" fill="var(--ink-soft)">
+                {Math.round(v)}
+              </text>
+            </g>
+          )
+        })}
+        {labels.map((lbl, i) =>
+          i % step === 0 ? (
+            <text key={lbl} x={x(i)} y={H - 10} textAnchor="middle" fontSize="9.5" fill="var(--ink-soft)">
+              {lbl.split(' ')[0]}
+            </text>
+          ) : null,
+        )}
+        {series.map((s) => (
+          <polyline
+            key={s.name}
+            fill="none"
+            stroke={s.color}
+            strokeWidth="2"
+            strokeLinejoin="round"
+            points={s.values.map((v, i) => `${x(i)},${y(v)}`).join(' ')}
+          />
+        ))}
+      </svg>
+      <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginTop: 4, paddingLeft: padL }}>
+        {series.map((s) => (
+          <span key={s.name} style={{ fontSize: 12, color: 'var(--ink-soft)' }}>
+            <i
+              style={{
+                display: 'inline-block',
+                width: 10,
+                height: 10,
+                borderRadius: 2,
+                background: s.color,
+                marginRight: 5,
+              }}
+            />
+            {s.name}
+          </span>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function PanierMoyen({ pb, baseUp }: { pb: PanierBuckets; baseUp: string }) {
   const [metric, setMetric] = useState<'count' | 'ca'>('count')
-  if (tb.years.length === 0) return null
-  const data = metric === 'count' ? tb.countByYear : tb.caByYear
+  if (pb.years.length === 0) return null
+  const data = metric === 'count' ? pb.countByYear : pb.caByYear
   const fmtCell = metric === 'count' ? INT : EUR
-  const total = metric === 'count' ? tb.totalCountByYear : tb.totalCaByYear
+  const total = metric === 'count' ? pb.totalCountByYear : pb.totalCaByYear
+  const series = pb.years.map((y, i) => ({
+    name: y,
+    color: YEAR_COLORS[i % YEAR_COLORS.length],
+    values: data[y],
+  }))
 
   return (
     <section>
       <div className="h2">
-        Analyse du ticket moyen <span className="tag">restaurant · tranche de 5 €</span>
+        Analyse du panier moyen <span className="tag">restaurant · tranche de 5 €</span>
       </div>
       <div className="controls" style={{ marginBottom: 12 }}>
         <div className="field">
@@ -815,35 +896,38 @@ function TicketMoyen({ tb, baseUp }: { tb: TicketBuckets; baseUp: string }) {
           </select>
         </div>
       </div>
-      <div className="daily">
+
+      <LineChart labels={pb.labels} series={series} />
+
+      <div className="daily" style={{ marginTop: 14 }}>
         <table className="day">
           <thead>
             <tr>
-              <th>Tranche (€)</th>
-              {tb.years.map((y) => (
+              <th>Panier (€)</th>
+              {pb.years.map((y) => (
                 <th key={y}>{y}</th>
               ))}
             </tr>
           </thead>
           <tbody>
-            {tb.labels.map((lbl, i) => (
+            {pb.labels.map((lbl, i) => (
               <tr key={lbl}>
                 <td>{lbl}</td>
-                {tb.years.map((y) => (
+                {pb.years.map((y) => (
                   <td key={y}>{fmtCell(data[y][i])}</td>
                 ))}
               </tr>
             ))}
             <tr className="tot">
               <td>Total</td>
-              {tb.years.map((y) => (
+              {pb.years.map((y) => (
                 <td key={y}>{fmtCell(total[y])}</td>
               ))}
             </tr>
             <tr className="tot">
-              <td>Ticket moyen</td>
-              {tb.years.map((y) => (
-                <td key={y}>{EUR2(tb.meanByYear[y])}</td>
+              <td>Panier moyen</td>
+              {pb.years.map((y) => (
+                <td key={y}>{EUR2(pb.meanByYear[y])}</td>
               ))}
             </tr>
           </tbody>
@@ -851,9 +935,9 @@ function TicketMoyen({ tb, baseUp }: { tb: TicketBuckets; baseUp: string }) {
       </div>
       <div className="foot">
         Répartition des <b>tickets restaurant</b> (au moins un plat ou une entrée ; bar et desserts seuls exclus)
-        par tranche de 5 € de leur montant <b>{baseUp}</b>, une colonne par année. Indépendant de la plage de
-        dates. Bascule « Nombre de tickets / CA des tickets » ci-dessus ; dernière ligne = ticket moyen restaurant
-        de l&apos;année (CA ÷ nombre de tickets).
+        selon leur <b>panier</b> = montant {baseUp} ÷ couverts, par tranche de 5 €, une colonne par année. Les
+        tickets sans couvert saisi sont exclus. La courbe montre la mesure choisie par tranche ; dernière ligne =
+        panier moyen de l&apos;année (CA ÷ couverts). Indépendant de la plage de dates.
       </div>
     </section>
   )
