@@ -26,11 +26,12 @@ type Props = {
   tickets: TicketMetric[]
   poire: PoireDay[]
   labor: LaborRow[]
+  pinsaByMonth: Record<string, number>
 }
 
 const CUTOFFS = [17, 16, 18, 19, 12]
 
-export default function Dashboard({ tickets, poire, labor }: Props) {
+export default function Dashboard({ tickets, poire, labor, pinsaByMonth }: Props) {
   const poireMap = useMemo(() => buildPoireMap(poire), [poire])
   const hasP = hasPoire(poireMap)
 
@@ -71,9 +72,9 @@ export default function Dashboard({ tickets, poire, labor }: Props) {
   const covPerDay = C.openDays ? C.couverts / C.openDays : null
 
   const pivot = useMemo(
-    () => monthlyPivot(tickets, poireMap, labor, ctrl),
+    () => monthlyPivot(tickets, poireMap, labor, pinsaByMonth, ctrl),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [tickets, poireMap, labor, cutoff, base, incPoire],
+    [tickets, poireMap, labor, pinsaByMonth, cutoff, base, incPoire],
   )
 
   // Coûts salariaux : brut estimé par mois + jours ouverts par mois (mois entier)
@@ -593,10 +594,16 @@ function sumCells(cells: MonthCell[]): MonthCell {
       nEntree: a.nEntree + c.nEntree,
       heures: a.heures + c.heures,
       brut: a.brut + c.brut,
+      caRestoMidi: a.caRestoMidi + c.caRestoMidi,
+      cvMidi: a.cvMidi + c.cvMidi,
+      caRestoSoir: a.caRestoSoir + c.caRestoSoir,
+      cvSoir: a.cvSoir + c.cvSoir,
+      nPinsa: a.nPinsa + c.nPinsa,
     }),
     {
       caTotal: 0, caResto: 0, caBar: 0, couverts: 0, nTickets: 0,
       openDays: 0, nDessert: 0, nEntree: 0, heures: 0, brut: 0,
+      caRestoMidi: 0, cvMidi: 0, caRestoSoir: 0, cvSoir: 0, nPinsa: 0,
     },
   )
 }
@@ -641,6 +648,24 @@ function Monthly({
       label: '% entrées',
       value: (c) => (c.couverts ? (100 * c.nEntree) / c.couverts : null),
       fmt: PCT,
+    },
+    {
+      key: 'panierMidi',
+      label: 'Panier moyen midi',
+      value: (c) => (c.cvMidi > 0 ? c.caRestoMidi / c.cvMidi : null),
+      fmt: EUR2,
+    },
+    {
+      key: 'panierSoir',
+      label: 'Panier moyen soir',
+      value: (c) => (c.cvSoir > 0 ? c.caRestoSoir / c.cvSoir : null),
+      fmt: EUR2,
+    },
+    {
+      key: 'nPinsa',
+      label: 'Nb pinsa (demi = 1)',
+      value: (c) => (c.nPinsa > 0 ? c.nPinsa : null),
+      fmt: INT,
     },
     ...(hasLab
       ? [

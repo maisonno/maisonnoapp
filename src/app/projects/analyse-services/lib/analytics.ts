@@ -292,6 +292,11 @@ export type MonthCell = {
   nEntree: number
   heures: number // heures travaillées (Combo)
   brut: number // brut salarial estimé, avant charges (Combo)
+  caRestoMidi: number // CA resto service midi
+  cvMidi: number // couverts resto midi
+  caRestoSoir: number // CA resto service soir
+  cvSoir: number // couverts resto soir
+  nPinsa: number // pinsa (catégorie Pinsa, demi/petite = 1)
 }
 
 export type MonthlyPivot = {
@@ -313,12 +318,18 @@ const blankMonth = (): MonthCell => ({
   nEntree: 0,
   heures: 0,
   brut: 0,
+  caRestoMidi: 0,
+  cvMidi: 0,
+  caRestoSoir: 0,
+  cvSoir: 0,
+  nPinsa: 0,
 })
 
 export function monthlyPivot(
   tickets: TicketMetric[],
   poire: Record<string, number>,
   labor: LaborRow[],
+  pinsaByMonth: Record<string, number>,
   ctrl: DashControls,
 ): MonthlyPivot {
   const cells: Record<string, MonthCell> = {}
@@ -332,6 +343,8 @@ export function monthlyPivot(
     const m = parseInt(t.jour.slice(5, 7), 10)
     const c = ensure(y, m)
     const v = ticketVal(t, ctrl.base)
+    const h = t.heure == null ? ctrl.cutoff : t.heure
+    const soir = h >= ctrl.cutoff || h < NIGHT
     c.caTotal += v
     c.nTickets++
     if (t.type === 'resto') {
@@ -339,11 +352,16 @@ export function monthlyPivot(
       c.couverts += t.couverts
       c.nDessert += t.n_dessert
       c.nEntree += t.n_entree
+      if (soir) {
+        c.caRestoSoir += v
+        c.cvSoir += t.couverts
+      } else {
+        c.caRestoMidi += v
+        c.cvMidi += t.couverts
+      }
     } else if (t.type === 'bar') {
       c.caBar += v
     }
-    const h = t.heure == null ? ctrl.cutoff : t.heure
-    const soir = h >= ctrl.cutoff || h < NIGHT
     const dc = dayCount[t.jour] || (dayCount[t.jour] = { midi: 0, soir: 0, ym: mKey(y, m) })
     if (soir) dc.soir++
     else dc.midi++
@@ -374,6 +392,13 @@ export function monthlyPivot(
     const c = ensure(y, m)
     c.heures += r.heures_travaillees || 0
     c.brut += estimateBrut(r)
+  }
+
+  // Pinsa par mois (vue ana_v_pinsa_monthly, clé 'YYYY-MM')
+  for (const ym in pinsaByMonth) {
+    const y = ym.slice(0, 4)
+    const m = parseInt(ym.slice(5, 7), 10)
+    ensure(y, m).nPinsa += pinsaByMonth[ym] || 0
   }
 
   const years = [...new Set(Object.keys(cells).map((k) => k.split('-')[0]))].sort()
