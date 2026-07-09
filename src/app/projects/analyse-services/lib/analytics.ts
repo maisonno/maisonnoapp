@@ -409,8 +409,9 @@ export function monthlyPivot(
 }
 
 // ─── Distribution des tickets par tranche de 5 € (analyse du ticket moyen) ───
-// Répartit chaque ticket (valeur = ttc ou ht selon base) dans une tranche de 5 €
-// (0-5, 5-10, …), par année. Indépendant de la fenêtre de dates.
+// Répartit chaque ticket RESTAURANT (au moins un plat ou une entrée ; bar et
+// desserts seuls exclus) dans une tranche de 5 € (0-5, 5-10, …), par année.
+// Valeur = ttc ou ht selon la base. Indépendant de la fenêtre de dates.
 
 const BUCKET_EUR = 5
 const NB_BUCKETS = 20 // 0 → 100 € ; l'indice 20 = « 100 €+ »
@@ -426,7 +427,8 @@ export type TicketBuckets = {
 }
 
 export function ticketBuckets(tickets: TicketMetric[], base: Base): TicketBuckets {
-  const years = [...new Set(tickets.map((t) => t.jour.slice(0, 4)))].sort()
+  const resto = tickets.filter((t) => t.type === 'resto')
+  const years = [...new Set(resto.map((t) => t.jour.slice(0, 4)))].sort()
   const countByYear: Record<string, number[]> = {}
   const caByYear: Record<string, number[]> = {}
   for (const y of years) {
@@ -434,7 +436,7 @@ export function ticketBuckets(tickets: TicketMetric[], base: Base): TicketBucket
     caByYear[y] = new Array(NB_BUCKETS + 1).fill(0)
   }
   let maxUsed = 0
-  for (const t of tickets) {
+  for (const t of resto) {
     const y = t.jour.slice(0, 4)
     const v = ticketVal(t, base)
     let idx = Math.floor(v / BUCKET_EUR)
