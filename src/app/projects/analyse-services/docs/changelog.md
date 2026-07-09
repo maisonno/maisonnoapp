@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-07-09 — Indicateurs mensuels : paniers midi/soir + pinsa
+- Tableau « Par mois » : ajout de **panier moyen midi**, **panier moyen soir**
+  (CA resto ÷ couverts par service) et **Nb pinsa**.
+- Pinsa comptées par **catégorie « Pinsa »** (inclut demi/petites, chacune = 1)
+  via une vue mensuelle légère `ana_v_pinsa_monthly` (migration `0014`).
+
 ## 2026-07-02 — Import masse salariale (Combo)
 - Nouvelle table **`ana_labor`** (migration `0013`) : 1 salarié × 1 mois, issue de
   l'onglet « Synthèse » de l'export comptable Combo. **Anonymisé** : les noms ne

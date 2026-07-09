@@ -67,6 +67,20 @@ export async function getAllLabor(): Promise<LaborRow[]> {
   return (data as unknown as LaborRow[]) ?? []
 }
 
+export async function getPinsaMonthly(): Promise<Record<string, number>> {
+  const supabase = await createClient()
+  const { data, error } = await supabase.from('ana_v_pinsa_monthly').select('ym,n_pinsa')
+  if (error) {
+    console.error('[ana] getPinsaMonthly error:', error.code, error.message)
+    return {}
+  }
+  const m: Record<string, number> = {}
+  for (const r of (data as unknown as { ym: string; n_pinsa: number }[]) ?? []) {
+    m[r.ym] = Number(r.n_pinsa) || 0
+  }
+  return m
+}
+
 export type ImportLogEntry = {
   id: number
   kind: string
