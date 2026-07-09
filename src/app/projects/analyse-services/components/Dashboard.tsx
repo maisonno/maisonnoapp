@@ -804,7 +804,7 @@ function TicketMoyen({ tb, baseUp }: { tb: TicketBuckets; baseUp: string }) {
   return (
     <section>
       <div className="h2">
-        Analyse du ticket moyen <span className="tag">par tranche de 5 €</span>
+        Analyse du ticket moyen <span className="tag">restaurant · tranche de 5 €</span>
       </div>
       <div className="controls" style={{ marginBottom: 12 }}>
         <div className="field">
@@ -850,10 +850,10 @@ function TicketMoyen({ tb, baseUp }: { tb: TicketBuckets; baseUp: string }) {
         </table>
       </div>
       <div className="foot">
-        Répartition de <b>tous les tickets</b> (resto, desserts, bar) par tranche de 5 € de leur montant{' '}
-        <b>{baseUp}</b>, une colonne par année. Indépendant de la plage de dates. Bascule « Nombre de tickets / CA
-        des tickets » ci-dessus ; dernière ligne = ticket moyen de l&apos;année (CA ÷ nombre de tickets). La Poire
-        (cash au jour, non ticketée) n&apos;est pas comptée ici.
+        Répartition des <b>tickets restaurant</b> (au moins un plat ou une entrée ; bar et desserts seuls exclus)
+        par tranche de 5 € de leur montant <b>{baseUp}</b>, une colonne par année. Indépendant de la plage de
+        dates. Bascule « Nombre de tickets / CA des tickets » ci-dessus ; dernière ligne = ticket moyen restaurant
+        de l&apos;année (CA ÷ nombre de tickets).
       </div>
     </section>
   )
