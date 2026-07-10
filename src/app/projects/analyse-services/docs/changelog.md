@@ -2,9 +2,10 @@
 
 ## 2026-07-09 — Analyse du panier moyen
 - Nouveau bloc : distribution des tickets **restaurant** par tranche de 5 € de
-  **panier** (montant ÷ couverts), une colonne par année, bascule **Nombre de
-  tickets / CA**, ligne panier moyen (CA ÷ couverts), + **graphique en courbe**
-  (une courbe par année, SVG léger). Calcul 100 % client (aucun SQL).
+  **panier** (montant ÷ couverts, jusqu'à « 70 €+ »), une colonne par année.
+  Respecte la **fenêtre de dates** du haut, rejouée sur chaque année. Mesures :
+  nombre de tickets, CA, **CA / jour ouvert**. **Diagramme à barres groupées**
+  (une couleur par année) + ligne panier moyen (CA ÷ couverts). 100 % client.
 
 ## 2026-07-09 — Indicateurs mensuels : paniers midi/soir + pinsa
 - Tableau « Par mois » : ajout de **panier moyen midi**, **panier moyen soir**
