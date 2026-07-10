@@ -101,7 +101,7 @@ export default function Dashboard({ tickets, poire, labor, pinsaByMonth }: Props
   const L = computeLabor(C, monthOpenDays, brutByMonth, chargeRate)
   const pctMasse = grand > 0 ? (100 * L.charged) / grand : null
 
-  const pb = useMemo(() => panierBuckets(tickets, base), [tickets, base])
+  const pb = useMemo(() => panierBuckets(tickets, base, from, to, cutoff), [tickets, base, from, to, cutoff])
 
   return (
     <div className="wrap">
@@ -796,7 +796,7 @@ function Monthly({
 
 const YEAR_COLORS = ['#C8443B', '#1E6FA8', '#D99A28', '#7A9A3C', '#4E8C6A', '#8E5BA6']
 
-function LineChart({
+function BarChart({
   labels,
   series,
 }: {
@@ -810,11 +810,16 @@ function LineChart({
   const padT = 12
   const padB = 30
   const n = labels.length
+  const m = series.length
   const maxV = Math.max(1, ...series.flatMap((s) => s.values))
-  const x = (i: number) => padL + (n <= 1 ? 0 : (i * (W - padL - padR)) / (n - 1))
+  const yBase = H - padB
   const y = (v: number) => padT + (H - padT - padB) * (1 - v / maxV)
+  const bandW = (W - padL - padR) / Math.max(1, n)
+  const groupW = bandW * 0.78
+  const barW = groupW / Math.max(1, m)
+  const x0 = (i: number) => padL + i * bandW + (bandW - groupW) / 2
   const ticks = 4
-  const step = Math.max(1, Math.ceil(n / 8)) // espacer les libellés X
+  const step = Math.max(1, Math.ceil(n / 10))
 
   return (
     <div style={{ overflowX: 'auto' }}>
@@ -831,23 +836,32 @@ function LineChart({
             </g>
           )
         })}
-        {labels.map((lbl, i) =>
-          i % step === 0 ? (
-            <text key={lbl} x={x(i)} y={H - 10} textAnchor="middle" fontSize="9.5" fill="var(--ink-soft)">
-              {lbl.split(' ')[0]}
-            </text>
-          ) : null,
-        )}
-        {series.map((s) => (
-          <polyline
-            key={s.name}
-            fill="none"
-            stroke={s.color}
-            strokeWidth="2"
-            strokeLinejoin="round"
-            points={s.values.map((v, i) => `${x(i)},${y(v)}`).join(' ')}
-          />
-        ))}
+        {labels.map((lbl, i) => {
+          const bx = x0(i) + groupW / 2
+          return (
+            <g key={lbl}>
+              {series.map((s, j) => {
+                const v = s.values[i] || 0
+                const yy = y(v)
+                return (
+                  <rect
+                    key={s.name}
+                    x={x0(i) + j * barW}
+                    y={yy}
+                    width={Math.max(1, barW - 1)}
+                    height={Math.max(0, yBase - yy)}
+                    fill={s.color}
+                  />
+                )
+              })}
+              {i % step === 0 ? (
+                <text x={bx} y={H - 10} textAnchor="middle" fontSize="9.5" fill="var(--ink-soft)">
+                  {lbl.split(' ')[0]}
+                </text>
+              ) : null}
+            </g>
+          )
+        })}
       </svg>
       <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginTop: 4, paddingLeft: padL }}>
         {series.map((s) => (
@@ -870,16 +884,31 @@ function LineChart({
   )
 }
 
+type PanierMetric = 'count' | 'ca' | 'caday'
+
 function PanierMoyen({ pb, baseUp }: { pb: PanierBuckets; baseUp: string }) {
-  const [metric, setMetric] = useState<'count' | 'ca'>('count')
+  const [metric, setMetric] = useState<PanierMetric>('count')
   if (pb.years.length === 0) return null
-  const data = metric === 'count' ? pb.countByYear : pb.caByYear
+
+  // Tableau de valeurs affichées selon la mesure (CA/jour = CA tranche / jours ouverts année)
+  const cell = (y: string, i: number): number => {
+    if (metric === 'count') return pb.countByYear[y][i]
+    if (metric === 'ca') return pb.caByYear[y][i]
+    const od = pb.openDaysByYear[y] || 0
+    return od > 0 ? pb.caByYear[y][i] / od : 0
+  }
+  const totalOf = (y: string): number => {
+    if (metric === 'count') return pb.totalCountByYear[y]
+    if (metric === 'ca') return pb.totalCaByYear[y]
+    const od = pb.openDaysByYear[y] || 0
+    return od > 0 ? pb.totalCaByYear[y] / od : 0
+  }
   const fmtCell = metric === 'count' ? INT : EUR
-  const total = metric === 'count' ? pb.totalCountByYear : pb.totalCaByYear
+
   const series = pb.years.map((y, i) => ({
     name: y,
     color: YEAR_COLORS[i % YEAR_COLORS.length],
-    values: data[y],
+    values: pb.labels.map((_, idx) => cell(y, idx)),
   }))
 
   return (
@@ -890,14 +919,15 @@ function PanierMoyen({ pb, baseUp }: { pb: PanierBuckets; baseUp: string }) {
       <div className="controls" style={{ marginBottom: 12 }}>
         <div className="field">
           <label>Mesure</label>
-          <select value={metric} onChange={(e) => setMetric(e.target.value as 'count' | 'ca')}>
+          <select value={metric} onChange={(e) => setMetric(e.target.value as PanierMetric)}>
             <option value="count">Nombre de tickets</option>
             <option value="ca">CA des tickets</option>
+            <option value="caday">CA / jour ouvert</option>
           </select>
         </div>
       </div>
 
-      <LineChart labels={pb.labels} series={series} />
+      <BarChart labels={pb.labels} series={series} />
 
       <div className="daily" style={{ marginTop: 14 }}>
         <table className="day">
@@ -914,14 +944,14 @@ function PanierMoyen({ pb, baseUp }: { pb: PanierBuckets; baseUp: string }) {
               <tr key={lbl}>
                 <td>{lbl}</td>
                 {pb.years.map((y) => (
-                  <td key={y}>{fmtCell(data[y][i])}</td>
+                  <td key={y}>{fmtCell(cell(y, i))}</td>
                 ))}
               </tr>
             ))}
             <tr className="tot">
               <td>Total</td>
               {pb.years.map((y) => (
-                <td key={y}>{fmtCell(total[y])}</td>
+                <td key={y}>{fmtCell(totalOf(y))}</td>
               ))}
             </tr>
             <tr className="tot">
@@ -935,9 +965,10 @@ function PanierMoyen({ pb, baseUp }: { pb: PanierBuckets; baseUp: string }) {
       </div>
       <div className="foot">
         Répartition des <b>tickets restaurant</b> (au moins un plat ou une entrée ; bar et desserts seuls exclus)
-        selon leur <b>panier</b> = montant {baseUp} ÷ couverts, par tranche de 5 €, une colonne par année. Les
-        tickets sans couvert saisi sont exclus. La courbe montre la mesure choisie par tranche ; dernière ligne =
-        panier moyen de l&apos;année (CA ÷ couverts). Indépendant de la plage de dates.
+        selon leur <b>panier</b> = montant {baseUp} ÷ couverts, par tranche de 5 € (jusqu&apos;à « 70 €+ »). La
+        fenêtre de dates du haut est <b>rejouée sur chaque année</b> pour les rendre comparables. Mesures : nombre
+        de tickets, CA, ou <b>CA / jour ouvert</b> (CA de la tranche ÷ jours d&apos;ouverture de l&apos;année). Les
+        tickets sans couvert saisi sont exclus ; dernière ligne = panier moyen (CA ÷ couverts).
       </div>
     </section>
   )

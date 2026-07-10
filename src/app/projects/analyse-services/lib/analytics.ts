@@ -412,11 +412,13 @@ export function monthlyPivot(
 // Pour chaque ticket RESTAURANT (au moins un plat ou une entrée ; bar et
 // desserts seuls exclus) avec au moins 1 couvert, on calcule le PANIER = valeur
 // du ticket / couverts, et on le range dans une tranche de 5 € (0-5, 5-10, …),
-// par année. « Nb tickets » = tickets rangés dans la tranche ; « CA » = somme du
-// CA de ces tickets. Valeur = ttc ou ht selon la base. Indépendant de la fenêtre.
+// par année. « Nb tickets » = tickets de la tranche ; « CA » = somme de leur CA ;
+// « CA/jour » = CA de la tranche / jours ouverts de l'année.
+// La fenêtre calendaire (MM-JJ de from→to) est rejouée sur CHAQUE année (comme la
+// comparaison annuelle) afin de garder les années comparables.
 
 const BUCKET_EUR = 5
-const NB_BUCKETS = 20 // 0 → 100 € ; l'indice 20 = « 100 €+ »
+const NB_BUCKETS = 14 // 0 → 70 € ; l'indice 14 = « 70 €+ »
 
 export type PanierBuckets = {
   years: string[]
@@ -426,10 +428,46 @@ export type PanierBuckets = {
   meanByYear: Record<string, number> // panier moyen = CA / couverts
   totalCountByYear: Record<string, number>
   totalCaByYear: Record<string, number>
+  openDaysByYear: Record<string, number> // jours ouverts pondérés (fenêtre, par année)
 }
 
-export function panierBuckets(tickets: TicketMetric[], base: Base): PanierBuckets {
-  const resto = tickets.filter((t) => t.type === 'resto' && t.couverts > 0)
+export function panierBuckets(
+  tickets: TicketMetric[],
+  base: Base,
+  from: string,
+  to: string,
+  cutoff: number,
+): PanierBuckets {
+  // Fenêtre calendaire (MM-JJ) rejouée sur chaque année
+  let mdFrom = from.slice(5)
+  let mdTo = to.slice(5)
+  if (mdFrom > mdTo) {
+    mdFrom = '01-01'
+    mdTo = '12-31'
+  }
+  const inWindow = (jour: string) => {
+    const md = jour.slice(5)
+    return md >= mdFrom && md <= mdTo
+  }
+  const sel = tickets.filter((t) => inWindow(t.jour))
+
+  // Jours ouverts pondérés par année (tous types de tickets)
+  const dayCount: Record<string, { midi: number; soir: number; y: string }> = {}
+  for (const t of sel) {
+    const h = t.heure == null ? cutoff : t.heure
+    const soir = h >= cutoff || h < NIGHT
+    const dc = dayCount[t.jour] || (dayCount[t.jour] = { midi: 0, soir: 0, y: t.jour.slice(0, 4) })
+    if (soir) dc.soir++
+    else dc.midi++
+  }
+  const openDaysByYear: Record<string, number> = {}
+  for (const d in dayCount) {
+    const dc = dayCount[d]
+    openDaysByYear[dc.y] =
+      (openDaysByYear[dc.y] || 0) + (dc.midi >= OPEN_MIN ? W_MIDI : 0) + (dc.soir >= OPEN_MIN ? W_SOIR : 0)
+  }
+
+  const resto = sel.filter((t) => t.type === 'resto' && t.couverts > 0)
   const years = [...new Set(resto.map((t) => t.jour.slice(0, 4)))].sort()
   const countByYear: Record<string, number[]> = {}
   const caByYear: Record<string, number[]> = {}
@@ -469,7 +507,16 @@ export function panierBuckets(tickets: TicketMetric[], base: Base): PanierBucket
     totalCaByYear[y] = tca
     meanByYear[y] = cvByYear[y] ? tca / cvByYear[y] : 0 // panier moyen = CA / couverts
   }
-  return { years, labels, countByYear, caByYear, meanByYear, totalCountByYear, totalCaByYear }
+  return {
+    years,
+    labels,
+    countByYear,
+    caByYear,
+    meanByYear,
+    totalCountByYear,
+    totalCaByYear,
+    openDaysByYear,
+  }
 }
 
 // ─── Coûts salariaux (export Combo) ───
