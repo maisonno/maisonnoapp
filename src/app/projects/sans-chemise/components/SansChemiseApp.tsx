@@ -33,7 +33,7 @@ export default function SansChemiseApp({ initialTab, modelesStock, modeles, arti
   return (
     <>
       <div className="min-h-[60vh]">
-        {tab === 'vente' && <SaleEntry modeles={modelesStock} />}
+        {tab === 'vente' && <SaleEntry articles={articles} />}
         {tab === 'ventes' && <SalesList ventes={ventes} modeles={modelesStock} />}
         {tab === 'stock' && <StockView articles={articles} mouvements={mouvements} />}
         {tab === 'modeles' && <ModelesView modeles={modeles} />}

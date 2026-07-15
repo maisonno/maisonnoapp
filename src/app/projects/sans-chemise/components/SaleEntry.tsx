@@ -1,77 +1,166 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import type { Article, ModeleWithArticles } from '../lib/types'
+import type { Article } from '../lib/types'
 import { createVente } from '../actions'
 
+type ArticleRow = Article & { modele_nom: string }
+
 type Props = {
-  modeles: ModeleWithArticles[]
+  articles: ArticleRow[]
 }
 
-export default function SaleEntry({ modeles }: Props) {
-  const router = useRouter()
-  const [selected, setSelected] = useState<ModeleWithArticles | null>(null)
-  const [toast, setToast] = useState<string | null>(null)
+const eur = (n: number) => n.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })
+const norm = (s: string) => s.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase()
 
-  const handleDone = (label: string) => {
-    setSelected(null)
+export default function SaleEntry({ articles }: Props) {
+  const router = useRouter()
+  const [search, setSearch] = useState('')
+  const [typeFilter, setTypeFilter] = useState('all')
+  const [selected, setSelected] = useState<ArticleRow | null>(null)
+  const [saving, setSaving] = useState<string | null>(null)
+  const [toast, setToast] = useState<string | null>(null)
+  // Décrément optimiste du stock après une vente rapide
+  const [optimistic, setOptimistic] = useState<Record<string, number>>({})
+  useEffect(() => { setOptimistic({}) }, [articles])
+
+  const stockOf = useCallback((a: ArticleRow) => optimistic[a.id] ?? a.stock, [optimistic])
+
+  // Types (variantes) présents parmi les articles vendables
+  const types = useMemo(
+    () => Array.from(new Set(articles.filter((a) => stockOf(a) > 0).map((a) => a.variante)))
+      .sort((a, b) => a.localeCompare(b, 'fr')),
+    [articles, stockOf],
+  )
+
+  // En stock uniquement, filtré, trié par stock décroissant (phares en cas d'égalité)
+  const rows = useMemo(() => {
+    const q = norm(search.trim())
+    return articles
+      .filter((a) => stockOf(a) > 0)
+      .filter((a) => typeFilter === 'all' || a.variante === typeFilter)
+      .filter((a) => !q || norm(`${a.modele_nom} ${a.variante} ${a.taille}`).includes(q))
+      .sort((a, b) => {
+        const d = stockOf(b) - stockOf(a)
+        if (d !== 0) return d
+        if (a.phare !== b.phare) return a.phare ? -1 : 1
+        return a.modele_nom.localeCompare(b.modele_nom, 'fr')
+      })
+  }, [articles, stockOf, search, typeFilter])
+
+  const showToast = (label: string) => {
     setToast(label)
-    router.refresh()
     setTimeout(() => setToast(null), 1800)
   }
 
-  const hasPhare = (m: ModeleWithArticles) => m.variantesPhares.some((v) => m.variantes.includes(v))
-
-  // Les modèles avec au moins une variante phare passent en premier
-  const sorted = useMemo(
-    () => [...modeles].sort((a, b) => {
-      const d = (hasPhare(a) ? 0 : 1) - (hasPhare(b) ? 0 : 1)
-      return d !== 0 ? d : a.nom.localeCompare(b.nom, 'fr')
-    }),
-    [modeles],
-  )
-
-  if (modeles.length === 0) {
-    return (
-      <p className="text-center text-slate-500 py-12">
-        Aucun modèle actif. Crée-en un dans l’onglet <span className="text-slate-300">Modèles</span>.
-      </p>
-    )
+  // Vente rapide : 1 article, CB, prix nominal
+  const quickSale = async (a: ArticleRow) => {
+    setSaving(a.id)
+    setOptimistic((o) => ({ ...o, [a.id]: stockOf(a) - 1 }))
+    const res = await createVente({
+      date: new Date().toISOString().split('T')[0],
+      article_id: a.id,
+      quantite: 1,
+      prix_unitaire: String(a.prix ?? 0),
+      mode_paiement: 'cb',
+      notes: '',
+    })
+    setSaving(null)
+    if (res.error) {
+      setOptimistic((o) => ({ ...o, [a.id]: (o[a.id] ?? a.stock) + 1 }))
+      alert(res.error)
+      return
+    }
+    showToast(`${a.modele_nom} · ${a.taille} ✓`)
+    router.refresh()
   }
+
+  const sellable = articles.some((a) => stockOf(a) > 0)
 
   return (
     <div className="space-y-3">
-      <p className="text-sm text-slate-400">Touche un modèle pour enregistrer une vente.</p>
-
-      <div className="grid grid-cols-2 gap-3">
-        {sorted.map((m) => {
-          const phare = hasPhare(m)
-          return (
-            <button
-              key={m.id}
-              onClick={() => setSelected(m)}
-              className={`text-left bg-slate-900 border rounded-2xl p-4 transition-colors active:bg-slate-800 ${
-                phare ? 'border-amber-500/40 hover:border-amber-500' : 'border-slate-800 hover:border-blue-600'
-              }`}
-            >
-              <div className="flex items-start gap-1">
-                {phare && <span className="text-amber-400 text-sm leading-tight shrink-0">★</span>}
-                <span className="font-semibold text-slate-100 leading-tight">{m.nom}</span>
-              </div>
-              <div className="text-blue-400 text-sm font-medium mt-1">
-                {m.prix.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })}
-              </div>
-              <div className="text-xs text-slate-500 mt-2">
-                Stock : <span className={m.stockTotal <= 0 ? 'text-red-400' : 'text-slate-300'}>{m.stockTotal}</span>
-              </div>
-            </button>
-          )
-        })}
+      {/* Recherche + filtre par type */}
+      <div className="flex gap-2">
+        <div className="relative flex-1">
+          <input
+            type="search"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Rechercher un modèle, une taille…"
+            className="input w-full pl-9"
+          />
+          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm">⌕</span>
+        </div>
+        <select
+          value={typeFilter}
+          onChange={(e) => setTypeFilter(e.target.value)}
+          className="input w-auto shrink-0"
+          aria-label="Filtrer par type"
+        >
+          <option value="all">Tous types</option>
+          {types.map((t) => <option key={t} value={t}>{t}</option>)}
+        </select>
       </div>
 
+      {!sellable ? (
+        <p className="text-center text-slate-500 py-12">
+          Aucun article en stock. Réceptionne du stock dans l’onglet{' '}
+          <span className="text-slate-300">Stock</span>.
+        </p>
+      ) : rows.length === 0 ? (
+        <p className="text-center text-slate-500 py-8">Aucun article ne correspond.</p>
+      ) : (
+        <div className="space-y-1.5">
+          {rows.map((a) => {
+            const stock = stockOf(a)
+            const prix = a.prix ?? 0
+            return (
+              <div
+                key={a.id}
+                className="flex items-center gap-2 bg-slate-900 border border-slate-800 rounded-xl pl-4 pr-2 py-1.5"
+              >
+                <button
+                  onClick={() => setSelected(a)}
+                  className="flex-1 min-w-0 text-left py-1"
+                  title="Options (quantité, espèces, prix…)"
+                >
+                  <div className="text-sm text-slate-200 truncate">
+                    {a.phare && <span className="text-amber-400">★ </span>}
+                    {a.modele_nom}
+                  </div>
+                  <div className="text-xs text-slate-500 truncate">
+                    {a.variante} · {a.taille} · <span className="text-blue-400">{eur(prix)}</span>
+                  </div>
+                </button>
+                <span className={`w-7 text-center text-sm font-bold tabular-nums ${
+                  stock <= 3 ? 'text-amber-400' : 'text-slate-100'
+                }`}>
+                  {stock}
+                </span>
+                <button
+                  onClick={() => quickSale(a)}
+                  disabled={saving === a.id}
+                  className="shrink-0 px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white text-sm font-semibold transition-colors disabled:opacity-50"
+                >
+                  Vente
+                </button>
+              </div>
+            )
+          })}
+        </div>
+      )}
+
       {selected && (
-        <SaleSheet modele={selected} onClose={() => setSelected(null)} onDone={handleDone} />
+        <ArticleSaleSheet
+          article={selected}
+          onClose={() => setSelected(null)}
+          onDone={(label) => {
+            setSelected(null)
+            showToast(label)
+            router.refresh()
+          }}
+        />
       )}
 
       {toast && (
@@ -85,52 +174,26 @@ export default function SaleEntry({ modeles }: Props) {
   )
 }
 
-function SaleSheet({
-  modele,
+// Feuille détaillée pour une vente sur un article précis (quantité, prix, paiement, date)
+function ArticleSaleSheet({
+  article,
   onClose,
   onDone,
 }: {
-  modele: ModeleWithArticles
+  article: ArticleRow
   onClose: () => void
   onDone: (label: string) => void
 }) {
   const today = new Date().toISOString().split('T')[0]
-
-  // Variantes réellement disponibles (ayant au moins un article actif)
-  const variantes = useMemo(() => {
-    const set = new Set(modele.articles.map((a) => a.variante))
-    return modele.variantes.filter((v) => set.has(v))
-  }, [modele])
-
-  // Prix de référence d'une variante (prix de l'article, sinon prix du modèle)
-  const priceForVariante = (v: string) => {
-    const first = modele.articles.find((a) => a.variante === v)
-    return first?.prix ?? modele.prix
-  }
-
-  const [variante, setVariante] = useState(variantes[0] ?? '')
-  const [article, setArticle] = useState<Article | null>(null)
   const [quantite, setQuantite] = useState(1)
-  const [prix, setPrix] = useState(String(priceForVariante(variantes[0] ?? '')))
+  const [prix, setPrix] = useState(String(article.prix ?? 0))
   const [mode, setMode] = useState<'cb' | 'especes'>('cb')
   const [date, setDate] = useState(today)
   const [showDate, setShowDate] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const tailles = useMemo(
-    () => modele.articles.filter((a) => a.variante === variante),
-    [modele, variante],
-  )
-
-  const handleVariante = (v: string) => {
-    setVariante(v)
-    setArticle(null)
-    setPrix(String(priceForVariante(v)))
-  }
-
   const handleSubmit = async () => {
-    if (!article) { setError('Choisis une taille'); return }
     setSaving(true)
     setError(null)
     const result = await createVente({
@@ -143,7 +206,7 @@ function SaleSheet({
     })
     setSaving(false)
     if (result.error) { setError(result.error); return }
-    onDone(`${modele.nom} ${article.taille} ✓`)
+    onDone(`${article.modele_nom} · ${article.taille} ✓`)
   }
 
   return (
@@ -153,60 +216,13 @@ function SaleSheet({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex justify-between items-start">
-          <div>
-            <h2 className="text-lg font-semibold">{modele.nom}</h2>
-            <p className="text-xs text-slate-500">Nouvelle vente</p>
+          <div className="min-w-0">
+            <h2 className="text-lg font-semibold truncate">{article.modele_nom}</h2>
+            <p className="text-xs text-slate-500">{article.variante} · {article.taille} · stock {article.stock}</p>
           </div>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-200 text-2xl leading-none">×</button>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-200 text-2xl leading-none shrink-0">×</button>
         </div>
 
-        {/* Variante (masquée si une seule) */}
-        {variantes.length > 1 && (
-          <div>
-            <label className="text-xs text-slate-400 block mb-1.5">Variante</label>
-            <div className="flex flex-wrap gap-2">
-              {variantes.map((v) => (
-                <button
-                  key={v}
-                  onClick={() => handleVariante(v)}
-                  className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
-                    variante === v ? 'bg-blue-600 text-white' : 'bg-slate-800 text-slate-300'
-                  }`}
-                >
-                  {v}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Tailles avec stock */}
-        <div>
-          <label className="text-xs text-slate-400 block mb-1.5">Taille</label>
-          <div className="grid grid-cols-4 gap-2">
-            {tailles.map((a) => {
-              const active = article?.id === a.id
-              return (
-                <button
-                  key={a.id}
-                  onClick={() => { setArticle(a); setPrix(String(a.prix ?? modele.prix)); setError(null) }}
-                  className={`flex flex-col items-center py-2 rounded-xl border text-sm font-semibold transition-colors ${
-                    active
-                      ? 'bg-blue-600 border-blue-500 text-white'
-                      : 'bg-slate-800 border-slate-700 text-slate-200'
-                  }`}
-                >
-                  {a.taille}
-                  <span className={`text-[10px] font-normal mt-0.5 ${a.stock <= 0 ? 'text-red-400' : active ? 'text-blue-100' : 'text-slate-500'}`}>
-                    {a.stock} en stock
-                  </span>
-                </button>
-              )
-            })}
-          </div>
-        </div>
-
-        {/* Quantité + prix sur une ligne */}
         <div className="flex gap-3">
           <div className="flex-1">
             <label className="text-xs text-slate-400 block mb-1.5">Quantité</label>
@@ -218,10 +234,7 @@ function SaleSheet({
                 −
               </button>
               <input
-                type="number"
-                inputMode="numeric"
-                min={1}
-                value={quantite}
+                type="number" inputMode="numeric" min={1} value={quantite}
                 onChange={(e) => setQuantite(Math.max(1, Math.round(Number(e.target.value) || 1)))}
                 className="input flex-1 text-center font-semibold"
               />
@@ -237,11 +250,7 @@ function SaleSheet({
             <label className="text-xs text-slate-400 block mb-1.5">Prix unit.</label>
             <div className="flex items-center gap-1">
               <input
-                type="number"
-                inputMode="decimal"
-                step="0.01"
-                min="0"
-                value={prix}
+                type="number" inputMode="decimal" step="0.01" min="0" value={prix}
                 onChange={(e) => setPrix(e.target.value)}
                 className="input text-right"
               />
@@ -250,13 +259,11 @@ function SaleSheet({
           </div>
         </div>
 
-        {/* Mode de paiement */}
         <div>
           <label className="text-xs text-slate-400 block mb-1.5">Paiement</label>
           <div className="flex gap-3">
             <button
-              type="button"
-              onClick={() => setMode('cb')}
+              type="button" onClick={() => setMode('cb')}
               className={`flex-1 py-2.5 rounded-xl font-medium text-sm transition-colors ${
                 mode === 'cb' ? 'bg-blue-600 text-white' : 'bg-slate-800 text-slate-400'
               }`}
@@ -264,8 +271,7 @@ function SaleSheet({
               💳 CB
             </button>
             <button
-              type="button"
-              onClick={() => setMode('especes')}
+              type="button" onClick={() => setMode('especes')}
               className={`flex-1 py-2.5 rounded-xl font-medium text-sm transition-colors ${
                 mode === 'especes' ? 'bg-emerald-700 text-white' : 'bg-slate-800 text-slate-400'
               }`}
@@ -275,7 +281,6 @@ function SaleSheet({
           </div>
         </div>
 
-        {/* Date repliée par défaut (vente du jour) */}
         {showDate ? (
           <div>
             <label className="text-xs text-slate-400 block mb-1.5">Date</label>
@@ -293,12 +298,12 @@ function SaleSheet({
 
         <button
           onClick={handleSubmit}
-          disabled={saving || !article}
-          className="w-full py-3.5 rounded-2xl bg-emerald-600 hover:bg-emerald-700 font-semibold text-base transition-colors disabled:opacity-40"
+          disabled={saving}
+          className="w-full py-3.5 rounded-2xl bg-emerald-600 hover:bg-emerald-700 font-semibold text-base transition-colors disabled:opacity-50"
         >
           {saving
             ? 'Enregistrement…'
-            : `Valider la vente${article ? ` · ${(quantite * (parseFloat(prix) || 0)).toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })}` : ''}`}
+            : `Valider la vente · ${eur(quantite * (parseFloat(prix) || 0))}`}
         </button>
       </div>
     </div>

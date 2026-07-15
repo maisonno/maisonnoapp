@@ -1,5 +1,15 @@
 # Sans Chemise — Changelog
 
+## 2026-06-27 — Écran « Vendre » en liste rapide
+
+- L'écran Vendre affiche les articles **en liste** (comme le Stock), avec
+  recherche et filtre par type (variante).
+- Les variantes en rupture (stock ≤ 0) sont masquées ; tri par **stock
+  décroissant** (variantes phares départagent à égalité).
+- Chaque ligne a un bouton **Vente** : enregistre en 1 tap une vente de 1,
+  en **CB**, au **prix nominal**.
+- Toucher la ligne ouvre une fiche détaillée (quantité, prix, CB/espèces, date).
+
 ## 2026-06-27 — Mode de paiement (CB / espèces)
 
 - Nouveau champ `snc_ventes.mode_paiement` (`'cb'`|`'especes'`) — migration
