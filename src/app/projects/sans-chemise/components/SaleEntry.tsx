@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import type { Article } from '../lib/types'
 import { createVente } from '../actions'
+import { TAILLES } from '../lib/constants'
 
 type ArticleRow = Article & { modele_nom: string }
 
@@ -50,12 +51,31 @@ export default function SaleEntry({ articles }: Props) {
       map.set(a.modele_nom, arr)
     }
 
+    const tailleIndex = (t: string) => {
+      const i = TAILLES.indexOf(t as (typeof TAILLES)[number])
+      return i === -1 ? 999 : i
+    }
+
     const result = Array.from(map.entries()).map(([nom, rows]) => {
+      // Stock cumulé et phare par variante (pour classer les variantes entre elles)
+      const varStock = new Map<string, number>()
+      const varPhare = new Map<string, boolean>()
+      for (const a of rows) {
+        varStock.set(a.variante, (varStock.get(a.variante) ?? 0) + stockOf(a))
+        if (a.phare) varPhare.set(a.variante, true)
+      }
       rows.sort((a, b) => {
-        const d = stockOf(b) - stockOf(a)
-        if (d !== 0) return d
-        if (a.phare !== b.phare) return a.phare ? -1 : 1
-        return a.variante.localeCompare(b.variante, 'fr')
+        if (a.variante !== b.variante) {
+          // Variantes classées par stock décroissant (phares en cas d'égalité)
+          const d = (varStock.get(b.variante) ?? 0) - (varStock.get(a.variante) ?? 0)
+          if (d !== 0) return d
+          const pa = varPhare.get(a.variante) ? 0 : 1
+          const pb = varPhare.get(b.variante) ? 0 : 1
+          if (pa !== pb) return pa - pb
+          return a.variante.localeCompare(b.variante, 'fr')
+        }
+        // Même variante : tailles dans l'ordre canonique (S, M, L, XL…)
+        return tailleIndex(a.taille) - tailleIndex(b.taille)
       })
       return {
         nom,
