@@ -11,8 +11,10 @@ d'une vente** et la **réduction du nombre de clics**.
 
 ## Fonctions
 
-1. **Saisie d'une vente** (onglet par défaut) — on touche le modèle, la taille,
-   on valide. Le prix est pré-rempli depuis le modèle et reste modifiable.
+1. **Saisie d'une vente** (onglet par défaut) — liste des articles en stock
+   (recherche + filtre par type), triée par stock décroissant. Bouton **Vente**
+   par ligne = vente en 1 tap (1 article, CB, prix nominal). Toucher la ligne
+   ouvre une fiche détaillée (quantité, prix, CB/espèces, date).
 2. **Liste des ventes** — historique avec total CA, édition et suppression.
 3. **Stock** — stock courant par article (modèle × variante × taille),
    réception de colis (ajout) et retrait (perte, casse, cadeau…), avec
