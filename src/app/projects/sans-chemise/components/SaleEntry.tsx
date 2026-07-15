@@ -34,19 +34,43 @@ export default function SaleEntry({ articles }: Props) {
     [articles, stockOf],
   )
 
-  // En stock uniquement, filtré, trié par stock décroissant (phares en cas d'égalité)
-  const rows = useMemo(() => {
+  // En stock uniquement, filtré, groupé par modèle.
+  // Lignes triées par stock décroissant ; groupes triés par stock total décroissant.
+  const groups = useMemo(() => {
     const q = norm(search.trim())
-    return articles
+    const list = articles
       .filter((a) => stockOf(a) > 0)
       .filter((a) => typeFilter === 'all' || a.variante === typeFilter)
       .filter((a) => !q || norm(`${a.modele_nom} ${a.variante} ${a.taille}`).includes(q))
-      .sort((a, b) => {
+
+    const map = new Map<string, ArticleRow[]>()
+    for (const a of list) {
+      const arr = map.get(a.modele_nom) ?? []
+      arr.push(a)
+      map.set(a.modele_nom, arr)
+    }
+
+    const result = Array.from(map.entries()).map(([nom, rows]) => {
+      rows.sort((a, b) => {
         const d = stockOf(b) - stockOf(a)
         if (d !== 0) return d
         if (a.phare !== b.phare) return a.phare ? -1 : 1
-        return a.modele_nom.localeCompare(b.modele_nom, 'fr')
+        return a.variante.localeCompare(b.variante, 'fr')
       })
+      return {
+        nom,
+        rows,
+        total: rows.reduce((s, a) => s + stockOf(a), 0),
+        phare: rows.some((a) => a.phare),
+      }
+    })
+
+    result.sort((a, b) => {
+      if (b.total !== a.total) return b.total - a.total
+      if (a.phare !== b.phare) return a.phare ? -1 : 1
+      return a.nom.localeCompare(b.nom, 'fr')
+    })
+    return result
   }, [articles, stockOf, search, typeFilter])
 
   const showToast = (label: string) => {
@@ -108,47 +132,51 @@ export default function SaleEntry({ articles }: Props) {
           Aucun article en stock. Réceptionne du stock dans l’onglet{' '}
           <span className="text-slate-300">Stock</span>.
         </p>
-      ) : rows.length === 0 ? (
+      ) : groups.length === 0 ? (
         <p className="text-center text-slate-500 py-8">Aucun article ne correspond.</p>
       ) : (
-        <div className="space-y-1.5">
-          {rows.map((a) => {
-            const stock = stockOf(a)
-            const prix = a.prix ?? 0
-            return (
-              <div
-                key={a.id}
-                className="flex items-center gap-2 bg-slate-900 border border-slate-800 rounded-xl pl-4 pr-2 py-1.5"
-              >
-                <button
-                  onClick={() => setSelected(a)}
-                  className="flex-1 min-w-0 text-left py-1"
-                  title="Options (quantité, espèces, prix…)"
-                >
-                  <div className="text-sm text-slate-200 truncate">
-                    {a.phare && <span className="text-amber-400">★ </span>}
-                    {a.modele_nom}
+        groups.map((g) => (
+          <div key={g.nom} className="space-y-1.5">
+            <h3 className="text-sm font-semibold text-slate-300">
+              {g.phare && <span className="text-amber-400">★ </span>}
+              {g.nom}
+            </h3>
+            <div className="space-y-1.5">
+              {g.rows.map((a) => {
+                const stock = stockOf(a)
+                const prix = a.prix ?? 0
+                return (
+                  <div
+                    key={a.id}
+                    className="flex items-center gap-2 bg-slate-900 border border-slate-800 rounded-xl pl-4 pr-2 py-1.5"
+                  >
+                    <button
+                      onClick={() => setSelected(a)}
+                      className="flex-1 min-w-0 text-left text-sm text-slate-300 py-1.5"
+                      title="Options (quantité, espèces, prix…)"
+                    >
+                      {a.phare && <span className="text-amber-400">★ </span>}
+                      {a.variante} · <span className="font-medium text-slate-200">{a.taille}</span>
+                      <span className="text-blue-400"> · {eur(prix)}</span>
+                    </button>
+                    <span className={`w-7 text-center text-sm font-bold tabular-nums ${
+                      stock <= 3 ? 'text-amber-400' : 'text-slate-100'
+                    }`}>
+                      {stock}
+                    </span>
+                    <button
+                      onClick={() => quickSale(a)}
+                      disabled={saving === a.id}
+                      className="shrink-0 px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white text-sm font-semibold transition-colors disabled:opacity-50"
+                    >
+                      Vente
+                    </button>
                   </div>
-                  <div className="text-xs text-slate-500 truncate">
-                    {a.variante} · {a.taille} · <span className="text-blue-400">{eur(prix)}</span>
-                  </div>
-                </button>
-                <span className={`w-7 text-center text-sm font-bold tabular-nums ${
-                  stock <= 3 ? 'text-amber-400' : 'text-slate-100'
-                }`}>
-                  {stock}
-                </span>
-                <button
-                  onClick={() => quickSale(a)}
-                  disabled={saving === a.id}
-                  className="shrink-0 px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white text-sm font-semibold transition-colors disabled:opacity-50"
-                >
-                  Vente
-                </button>
-              </div>
-            )
-          })}
-        </div>
+                )
+              })}
+            </div>
+          </div>
+        ))
       )}
 
       {selected && (
