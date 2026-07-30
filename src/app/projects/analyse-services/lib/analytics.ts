@@ -408,7 +408,93 @@ export function monthlyPivot(
   return { years, months, cells }
 }
 
-// ─── Distribution du panier par tranche de 5 € (analyse du panier moyen) ───
+// ─── Pivot par jour de la semaine (année × jour) ───
+// Même principe que monthlyPivot mais regroupé par jour de semaine (1=lundi … 7=dimanche)
+// et RESTREINT à la fenêtre de dates (MM-JJ de from→to rejouée sur chaque année).
+// Indicateurs issus des tickets uniquement (masse salariale / pinsa sont mensuels
+// et ne se ventilent pas par jour de semaine).
+
+export type WeekdayPivot = {
+  years: string[]
+  weekdays: number[] // présents, triés (1=lundi … 7=dimanche)
+  cells: Record<string, MonthCell> // clé `${year}-${weekday}`
+}
+
+const weekdayOf = (jour: string) => {
+  const d = new Date(jour + 'T00:00:00Z').getUTCDay() // 0=dim … 6=sam
+  return d === 0 ? 7 : d // 1=lundi … 7=dimanche
+}
+
+export function weekdayPivot(
+  tickets: TicketMetric[],
+  poire: Record<string, number>,
+  ctrl: DashControls,
+): WeekdayPivot {
+  let mdFrom = ctrl.from.slice(5)
+  let mdTo = ctrl.to.slice(5)
+  if (mdFrom > mdTo) {
+    mdFrom = '01-01'
+    mdTo = '12-31'
+  }
+  const inWin = (jour: string) => {
+    const md = jour.slice(5)
+    return md >= mdFrom && md <= mdTo
+  }
+
+  const cells: Record<string, MonthCell> = {}
+  const ensure = (y: string, wd: number) => (cells[`${y}-${wd}`] ||= blankMonth())
+  const dayCount: Record<string, { midi: number; soir: number; key: string }> = {}
+
+  for (const t of tickets) {
+    if (!inWin(t.jour)) continue
+    const y = t.jour.slice(0, 4)
+    const wd = weekdayOf(t.jour)
+    const c = ensure(y, wd)
+    const v = ticketVal(t, ctrl.base)
+    const h = t.heure == null ? ctrl.cutoff : t.heure
+    const soir = h >= ctrl.cutoff || h < NIGHT
+    c.caTotal += v
+    c.nTickets++
+    if (t.type === 'resto') {
+      c.caResto += v
+      c.couverts += t.couverts
+      c.nDessert += t.n_dessert
+      c.nEntree += t.n_entree
+      if (soir) {
+        c.caRestoSoir += v
+        c.cvSoir += t.couverts
+      } else {
+        c.caRestoMidi += v
+        c.cvMidi += t.couverts
+      }
+    } else if (t.type === 'bar') {
+      c.caBar += v
+    }
+    const dc = dayCount[t.jour] || (dayCount[t.jour] = { midi: 0, soir: 0, key: `${y}-${wd}` })
+    if (soir) dc.soir++
+    else dc.midi++
+  }
+
+  if (incP(ctrl, poire)) {
+    for (const d in poire) {
+      if (!inWin(d)) continue
+      const c = ensure(d.slice(0, 4), weekdayOf(d))
+      c.caTotal += poire[d]
+      c.caBar += poire[d]
+    }
+  }
+
+  for (const dk in dayCount) {
+    const dc = dayCount[dk]
+    cells[dc.key].openDays += (dc.midi >= OPEN_MIN ? W_MIDI : 0) + (dc.soir >= OPEN_MIN ? W_SOIR : 0)
+  }
+
+  const years = [...new Set(Object.keys(cells).map((k) => k.split('-')[0]))].sort()
+  const weekdays = [...new Set(Object.keys(cells).map((k) => parseInt(k.split('-')[1], 10)))].sort(
+    (a, b) => a - b,
+  )
+  return { years, weekdays, cells }
+}
 // Pour chaque ticket RESTAURANT (au moins un plat ou une entrée ; bar et
 // desserts seuls exclus) avec au moins 1 couvert, on calcule le PANIER = valeur
 // du ticket / couverts, et on le range dans une tranche de 5 € (0-5, 5-10, …),

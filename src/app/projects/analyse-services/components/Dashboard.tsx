@@ -14,6 +14,7 @@ import {
   mergeRes,
   monthlyPivot,
   panierBuckets,
+  weekdayPivot,
   yearStats,
   type LaborResult,
   type MonthCell,
@@ -21,6 +22,7 @@ import {
   type PanierBuckets,
   type RestoCell,
   type SvcCell,
+  type WeekdayPivot,
 } from '../lib/analytics'
 import { EUR, EUR2, INT, N1, PCT, frDMY, frDate, frMD } from '../lib/format'
 
@@ -102,6 +104,11 @@ export default function Dashboard({ tickets, poire, labor, pinsaByMonth }: Props
   const pctMasse = grand > 0 ? (100 * L.charged) / grand : null
 
   const pb = useMemo(() => panierBuckets(tickets, base, from, to, cutoff), [tickets, base, from, to, cutoff])
+  const wdPivot = useMemo(
+    () => weekdayPivot(tickets, poireMap, ctrl),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [tickets, poireMap, from, to, cutoff, base, incPoire],
+  )
 
   return (
     <div className="wrap">
@@ -253,6 +260,9 @@ export default function Dashboard({ tickets, poire, labor, pinsaByMonth }: Props
 
       {/* Tableau par mois */}
       <Monthly pivot={pivot} baseUp={baseUp} chargeRate={chargeRate} hasLab={hasLab} />
+
+      {/* Par jour de la semaine */}
+      <Weekday pivot={wdPivot} baseUp={baseUp} />
 
       {/* Analyse du panier moyen */}
       <PanierMoyen pb={pb} baseUp={baseUp} />
@@ -787,6 +797,149 @@ function Monthly({
         choisie plus haut (le mois est le regroupement). La ligne <b>Moyenne</b> est la moyenne sur les années où
         le mois a des données (pas une somme). « CA moyen / jour ouvert » et « Couverts / jour ouvert » utilisent
         les jours d&apos;ouverture pondérés ; « % desserts / entrées » se basent sur les couverts restaurant.
+      </div>
+    </section>
+  )
+}
+
+// ─── Par jour de la semaine ───
+
+const WEEKDAY_LABELS: Record<number, string> = {
+  1: 'lundi',
+  2: 'mardi',
+  3: 'mercredi',
+  4: 'jeudi',
+  5: 'vendredi',
+  6: 'samedi',
+  7: 'dimanche',
+}
+
+// Indicateurs issus des tickets (sous-ensemble de « Par mois » ventilable au jour)
+const WD_INDICS: Indic[] = [
+  { key: 'caTotal', label: 'CA total', value: (c) => c.caTotal, fmt: EUR },
+  { key: 'caResto', label: 'CA resto', value: (c) => c.caResto, fmt: EUR },
+  { key: 'caBar', label: 'CA bar', value: (c) => c.caBar, fmt: EUR },
+  { key: 'couverts', label: 'Nb couverts', value: (c) => c.couverts, fmt: INT },
+  { key: 'nTickets', label: 'Nb tickets', value: (c) => c.nTickets, fmt: INT },
+  {
+    key: 'caPerDay',
+    label: 'CA moyen / jour ouvert',
+    value: (c) => (c.openDays ? c.caTotal / c.openDays : null),
+    fmt: EUR,
+  },
+  {
+    key: 'covPerDay',
+    label: 'Couverts / jour ouvert',
+    value: (c) => (c.openDays ? c.couverts / c.openDays : null),
+    fmt: N1,
+  },
+  {
+    key: 'pctDess',
+    label: '% desserts',
+    value: (c) => (c.couverts ? (100 * c.nDessert) / c.couverts : null),
+    fmt: PCT,
+  },
+  {
+    key: 'pctEnt',
+    label: '% entrées',
+    value: (c) => (c.couverts ? (100 * c.nEntree) / c.couverts : null),
+    fmt: PCT,
+  },
+]
+
+function Weekday({ pivot, baseUp }: { pivot: WeekdayPivot; baseUp: string }) {
+  const [ind, setInd] = useState('caTotal')
+  const cur = WD_INDICS.find((i) => i.key === ind) ?? WD_INDICS[0]
+  if (pivot.years.length === 0) return null
+
+  const fmt = (v: number | null) => (v == null ? '—' : cur.fmt(v))
+  const cell = (y: string, wd: number): MonthCell | undefined => pivot.cells[`${y}-${wd}`]
+  const mean = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : null)
+
+  return (
+    <section>
+      <div className="h2">
+        Par jour de la semaine <span className="tag">{cur.label}</span>
+      </div>
+      <div className="controls" style={{ marginBottom: 12 }}>
+        <div className="field">
+          <label>Indicateur</label>
+          <select value={ind} onChange={(e) => setInd(e.target.value)}>
+            {WD_INDICS.map((i) => (
+              <option key={i.key} value={i.key}>
+                {i.label}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+      <div className="daily">
+        <table className="day">
+          <thead>
+            <tr>
+              <th>Année</th>
+              {pivot.weekdays.map((wd) => (
+                <th key={wd}>{WEEKDAY_LABELS[wd]}</th>
+              ))}
+              <th>Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            {pivot.years.map((y) => {
+              const yearCells = pivot.weekdays
+                .map((wd) => cell(y, wd))
+                .filter((c): c is MonthCell => !!c)
+              const yearTot = sumCells(yearCells)
+              return (
+                <tr key={y}>
+                  <td>
+                    <span className="yr">{y}</span>
+                  </td>
+                  {pivot.weekdays.map((wd) => {
+                    const c = cell(y, wd)
+                    return <td key={wd}>{c ? fmt(cur.value(c)) : '—'}</td>
+                  })}
+                  <td>
+                    <b>{fmt(cur.value(yearTot))}</b>
+                  </td>
+                </tr>
+              )
+            })}
+            <tr className="tot">
+              <td>Moyenne</td>
+              {pivot.weekdays.map((wd) => {
+                const vals = pivot.years
+                  .map((y) => {
+                    const c = cell(y, wd)
+                    return c ? cur.value(c) : null
+                  })
+                  .filter((v): v is number => v != null)
+                return <td key={wd}>{fmt(mean(vals))}</td>
+              })}
+              <td>
+                {fmt(
+                  mean(
+                    pivot.years
+                      .map((y) => {
+                        const yc = pivot.weekdays
+                          .map((wd) => cell(y, wd))
+                          .filter((c): c is MonthCell => !!c)
+                        return yc.length ? cur.value(sumCells(yc)) : null
+                      })
+                      .filter((v): v is number => v != null),
+                  ),
+                )}
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div className="foot">
+        Une ligne par année, une colonne par jour de semaine · base <b>{baseUp}</b>. Calculé sur les jours de la{' '}
+        <b>période saisie en haut</b>, rejouée sur chaque année pour les rendre comparables. « CA / jour ouvert »
+        et « Couverts / jour ouvert » rapportent au nombre de jours de ce type ouverts (service ≥ 5 tickets). La
+        ligne <b>Moyenne</b> = moyenne sur les années ayant des données. Masse salariale, heures et pinsa (données
+        mensuelles) ne sont pas ventilables ici.
       </div>
     </section>
   )
