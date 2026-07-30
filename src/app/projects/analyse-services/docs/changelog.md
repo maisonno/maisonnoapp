@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-07-09 — Par jour de la semaine
+- Nouvelle section (après « Par mois ») : pivot **année × jour de semaine**
+  (lundi→dimanche), indicateur au choix (sous-ensemble ticket de « Par mois »).
+  **Restreint à la période saisie** en haut, rejouée sur chaque année. Ligne
+  Moyenne sur les années. 100 % client.
+
 ## 2026-07-09 — Analyse du panier moyen
 - Nouveau bloc : distribution des tickets **restaurant** par tranche de 5 € de
   **panier** (montant ÷ couverts, jusqu'à « 70 €+ »), une colonne par année.
