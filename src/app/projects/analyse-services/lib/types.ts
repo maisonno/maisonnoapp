@@ -38,6 +38,7 @@ export type PoireDay = {
 // Coûts salariaux (ana_labor) — 1 salarié × 1 mois, anonymisé
 export type LaborRow = {
   periode: string // 'YYYY-MM-DD' (1er du mois)
+  employe_hash?: string | null // hash anonyme (rattachement d'un contrat)
   poste: string | null
   contrat: string | null
   salaire_base: number
@@ -51,6 +52,37 @@ export type LaborRow = {
   h_feries: number | null
   h_1er_mai: number | null
   conges_payes_j: number | null
+}
+
+// ─── Coûts salariaux : contrats & compléments (zone protégée) ───
+
+export type Contrat = {
+  id: string
+  nom_affichage: string
+  poste: string | null
+  contrat: string | null
+  employe_hash: string | null
+  date_debut: string | null // 'YYYY-MM-DD'
+  date_fin: string | null
+  heures_hebdo_contrat: number | null
+  salaire_brut_mensuel: number | null
+  heures_hebdo_cible: number | null
+  actif: boolean
+}
+
+export type RemunerationPoire = {
+  id: string
+  contrat_id: string
+  mois: string // 'YYYY-MM-DD' (1er du mois)
+  montant: number
+}
+
+// Salarié anonyme issu de l'import Combo (pour rattacher un contrat)
+export type LaborEmploye = {
+  employe_hash: string
+  poste: string | null
+  contrat: string | null
+  salaire_base: number
 }
 
 // État des contrôles du tableau de bord

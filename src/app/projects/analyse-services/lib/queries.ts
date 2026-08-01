@@ -1,5 +1,12 @@
 import { createClient } from '@/lib/supabase/server'
-import type { LaborRow, PoireDay, TicketMetric } from './types'
+import type {
+  Contrat,
+  LaborEmploye,
+  LaborRow,
+  PoireDay,
+  RemunerationPoire,
+  TicketMetric,
+} from './types'
 
 const PAGE = 1000 // PostgREST limite à 1000 lignes/requête → pagination
 
@@ -56,8 +63,8 @@ export async function getAllLabor(): Promise<LaborRow[]> {
   const { data, error } = await supabase
     .from('ana_labor')
     .select(
-      'periode,poste,contrat,salaire_base,heures_contrat_mensuel,heures_travaillees,jours_travailles,' +
-        'h_supp_10,h_supp_20,h_supp_50,h_nuit,h_feries,h_1er_mai,conges_payes_j',
+      'periode,employe_hash,poste,contrat,salaire_base,heures_contrat_mensuel,heures_travaillees,' +
+        'jours_travailles,h_supp_10,h_supp_20,h_supp_50,h_nuit,h_feries,h_1er_mai,conges_payes_j',
     )
     .order('periode', { ascending: true })
   if (error) {
@@ -65,6 +72,66 @@ export async function getAllLabor(): Promise<LaborRow[]> {
     return []
   }
   return (data as unknown as LaborRow[]) ?? []
+}
+
+// ─── Coûts salariaux : contrats, compléments, paramètres ───
+
+export async function getContrats(): Promise<Contrat[]> {
+  const supabase = await createClient()
+  const { data, error } = await supabase
+    .from('ana_contrats')
+    .select(
+      'id,nom_affichage,poste,contrat,employe_hash,date_debut,date_fin,' +
+        'heures_hebdo_contrat,salaire_brut_mensuel,heures_hebdo_cible,actif',
+    )
+    .order('nom_affichage', { ascending: true })
+  if (error) {
+    console.error('[ana] getContrats error:', error.code, error.message)
+    return []
+  }
+  return (data as unknown as Contrat[]) ?? []
+}
+
+export async function getRemunerationPoire(): Promise<RemunerationPoire[]> {
+  const supabase = await createClient()
+  const { data, error } = await supabase
+    .from('ana_remuneration_poire')
+    .select('id,contrat_id,mois,montant')
+    .order('mois', { ascending: true })
+  if (error) {
+    console.error('[ana] getRemunerationPoire error:', error.code, error.message)
+    return []
+  }
+  return (data as unknown as RemunerationPoire[]) ?? []
+}
+
+export async function getParam(cle: string, defaut: number): Promise<number> {
+  const supabase = await createClient()
+  const { data, error } = await supabase.from('ana_params').select('valeur').eq('cle', cle).maybeSingle()
+  if (error) {
+    console.error('[ana] getParam error:', error.code, error.message)
+    return defaut
+  }
+  const v = (data as { valeur: number } | null)?.valeur
+  return v == null ? defaut : Number(v)
+}
+
+// Salariés anonymes présents dans l'import Combo (pour rattacher un contrat)
+export async function getLaborEmployes(): Promise<LaborEmploye[]> {
+  const supabase = await createClient()
+  const { data, error } = await supabase
+    .from('ana_labor')
+    .select('employe_hash,poste,contrat,salaire_base')
+    .order('periode', { ascending: false })
+  if (error) {
+    console.error('[ana] getLaborEmployes error:', error.code, error.message)
+    return []
+  }
+  const seen = new Map<string, LaborEmploye>()
+  for (const r of (data as unknown as LaborEmploye[]) ?? []) {
+    if (!seen.has(r.employe_hash)) seen.set(r.employe_hash, r)
+  }
+  return [...seen.values()]
 }
 
 export async function getPinsaMonthly(): Promise<Record<string, number>> {
@@ -89,6 +156,7 @@ export type ImportLogEntry = {
   tickets_upserted: number | null
   lines_upserted: number | null
   poire_upserted: number | null
+  labor_upserted: number | null
   created_at: string
 }
 

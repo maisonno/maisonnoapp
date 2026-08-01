@@ -1,7 +1,6 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import Link from 'next/link'
 import type { Base, DashControls, LaborRow, PoireDay, TicketMetric } from '../lib/types'
 import {
   buildPoireMap,
@@ -111,33 +110,7 @@ export default function Dashboard({ tickets, poire, labor, pinsaByMonth }: Props
   )
 
   return (
-    <div className="wrap">
-      <header>
-        <div className="topnav">
-          <Link href="/">← Accueil</Link>
-          <span className="sep">/</span>
-          <span>Analyse des services</span>
-        </div>
-        <div className="eyebrow">La Pomme d&apos;Adam · Île du Levant</div>
-        <h1>
-          Analyse des <span className="blue">services</span>
-        </h1>
-        <p className="sub">
-          Restaurant, desserts seuls et bar, midi et soir, Poire intégrée et comparaison des années —
-          le tout à partir des données stockées.
-        </p>
-        <div className="triline">
-          <span className="a" />
-          <span className="b" />
-          <span className="c" />
-        </div>
-        <div className="toolbar">
-          <Link className="btn btn-ghost" href="/projects/analyse-services/import">
-            ↑ Importer des données
-          </Link>
-        </div>
-      </header>
-
+    <>
       {/* Controls */}
       <div className="controls">
         <div className="field">
@@ -289,7 +262,7 @@ export default function Dashboard({ tickets, poire, labor, pinsaByMonth }: Props
       </section>
 
       <Foot cutoff={cutoff} baseUp={baseUp} hasP={hasP} />
-    </div>
+    </>
   )
 }
 

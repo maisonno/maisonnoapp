@@ -1,8 +1,8 @@
 import { redirect } from 'next/navigation'
-import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { getImportLog } from '../lib/queries'
 import ImportClient from '../components/ImportClient'
+import PageHeader from '../components/PageHeader'
 
 export const metadata = { title: 'Import — Analyse des services' }
 
@@ -26,29 +26,7 @@ export default async function ImportPage() {
 
   return (
     <div className="wrap">
-      <header>
-        <div className="topnav">
-          <Link href="/">← Accueil</Link>
-          <span className="sep">/</span>
-          <Link href="/projects/analyse-services">Analyse des services</Link>
-          <span className="sep">/</span>
-          <span>Import</span>
-        </div>
-        <div className="eyebrow">La Pomme d&apos;Adam · Île du Levant</div>
-        <h1>
-          Importer des <span className="blue">données</span>
-        </h1>
-        <p className="sub">
-          Dépose tes exports L&apos;Addition (.xlsx, une ou plusieurs années) et, si tu veux, ta caisse
-          Scoubidoo (.csv) ou ton fichier Poire (.xlsx). Le type est détecté automatiquement et l&apos;import est
-          idempotent : ré-importer un export qui chevauche une période déjà chargée ne crée aucun doublon.
-        </p>
-        <div className="triline">
-          <span className="a" />
-          <span className="b" />
-          <span className="c" />
-        </div>
-      </header>
+      <PageHeader sub="Dépose tes exports L'Addition (.xlsx), ta caisse Scoubidoo (.csv), ton fichier Poire (.xlsx) ou l'export comptable Combo. Le type est détecté automatiquement et l'import est idempotent : ré-importer une période déjà chargée ne crée aucun doublon." />
 
       <ImportClient />
 
@@ -68,18 +46,20 @@ export default async function ImportPage() {
                   <th>Tickets</th>
                   <th>Lignes</th>
                   <th>Poire</th>
+                  <th>Salariés</th>
                 </tr>
               </thead>
               <tbody>
                 {log.map((e) => (
                   <tr key={e.id}>
                     <td>{fmtDate(e.created_at)}</td>
-                    <td>{e.kind === 'ventes' ? 'Ventes' : 'Poire'}</td>
+                    <td>{e.kind === 'ventes' ? 'Ventes' : e.kind === 'combo' ? 'Masse sal.' : 'Poire'}</td>
                     <td>{e.file_name ?? '—'}</td>
                     <td>{e.rows_in?.toLocaleString('fr-FR') ?? '—'}</td>
                     <td>{e.tickets_upserted?.toLocaleString('fr-FR') ?? '—'}</td>
                     <td>{e.lines_upserted?.toLocaleString('fr-FR') ?? '—'}</td>
                     <td>{e.poire_upserted?.toLocaleString('fr-FR') ?? '—'}</td>
+                    <td>{e.labor_upserted?.toLocaleString('fr-FR') ?? '—'}</td>
                   </tr>
                 ))}
               </tbody>
