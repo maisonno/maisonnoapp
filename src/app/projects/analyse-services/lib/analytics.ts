@@ -6,6 +6,7 @@
 //  - service du soir = heure ≥ cutoff OU heure < 5 (rebouclage nuit) ;
 //  - Poire = cash TTC au jour, ajoutée au bar et au total, non ventilée midi/soir.
 
+import { brutDetail } from './labor'
 import type { Base, DashControls, LaborRow, PoireDay, TicketMetric, TicketType } from './types'
 
 const NIGHT = 5
@@ -615,21 +616,11 @@ export function panierBuckets(
 //   PAS de majoration de nuit (convention CHR) ;
 //   provision congés payés : +10 % sur l'ensemble.
 // C'est une ESTIMATION de gestion, pas un calcul de paie.
-
-const CP_RATE = 0.1 // provision congés payés
-const SIXTH_DAY = 1 / 6 // « 6 jours payés 7 »
+// Le détail par composante vit dans lib/labor.ts (source unique de vérité) ;
+// estimateBrut n'en est que la somme, conservée pour les appelants existants.
 
 export function estimateBrut(r: LaborRow): number {
-  const base = r.salaire_base || 0
-  const h = r.heures_contrat_mensuel || 0
-  const hr = h > 0 ? base / h : 0
-  const supp =
-    hr *
-    ((r.h_supp_10 || 0) * 1.1 + (r.h_supp_20 || 0) * 1.2 + (r.h_supp_50 || 0) * 1.5)
-  const ferie = hr * (r.h_feries || 0) * 1.0
-  const mai = hr * (r.h_1er_mai || 0) * 1.0
-  const sixth = base * SIXTH_DAY
-  return (base + supp + ferie + mai + sixth) * (1 + CP_RATE)
+  return brutDetail(r).brut
 }
 
 // Brut estimé agrégé par mois de paie (clé 'YYYY-MM')

@@ -1,5 +1,20 @@
 # Changelog
 
+## 2026-08-01 — Onglets & module « Coûts salariaux »
+- **Onglets** : Revenus caisse · Coûts salariaux · Coûts appro · Autres coûts ·
+  Synthèse · Importation (en-tête partagé `PageHeader` + `TabBar`, `?tab=`).
+  Appro / Autres / Synthèse sont des placeholders.
+- **Onglet Coûts salariaux** : masse salariale **agrégée par mois**, réalisé
+  (import Combo) et **prévisionnel** (contrats × heures hebdo cible), % du CA,
+  bouton **Détail**.
+- **Page Détail** (`/detail`, code d'accès `1932`, zone protégée) : contrats
+  (période, h. hebdo, brut, h. cible, rattachement à l'import anonyme),
+  compléments **« Poire »** par salarié × mois (cash, **hors charges**), heures
+  réalisées / prévisionnelles, **coefficient de charges patronales** persisté,
+  et **décomposition mensuelle du coût global**.
+- Migration `0015_couts_salariaux.sql` : `ana_contrats`, `ana_remuneration_poire`,
+  `ana_params`. Le calcul du brut est factorisé dans `lib/labor.ts`.
+
 ## 2026-07-09 — Par jour de la semaine
 - Nouvelle section (après « Par mois ») : pivot **année × jour de semaine**
   (lundi→dimanche), indicateur au choix (sous-ensemble ticket de « Par mois »).
