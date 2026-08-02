@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { getImportLog } from '../lib/queries'
 import ImportClient from '../components/ImportClient'
+import ImportPoireScoubidoo from '../components/ImportPoireScoubidoo'
 import PageHeader from '../components/PageHeader'
 
 export const metadata = { title: 'Import — Analyse des services' }
@@ -29,6 +30,8 @@ export default async function ImportPage() {
       <PageHeader sub="Dépose tes exports L'Addition (.xlsx), ta caisse Scoubidoo (.csv), ton fichier Poire (.xlsx) ou l'export comptable Combo. Le type est détecté automatiquement et l'import est idempotent : ré-importer une période déjà chargée ne crée aucun doublon." />
 
       <ImportClient />
+
+      <ImportPoireScoubidoo />
 
       <section>
         <div className="h2">Journal des imports</div>

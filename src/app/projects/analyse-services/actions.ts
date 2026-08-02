@@ -3,7 +3,11 @@
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 
-const PATHS = ['/projects/analyse-services', '/projects/analyse-services/detail']
+const PATHS = [
+  '/projects/analyse-services',
+  '/projects/analyse-services/detail',
+  '/projects/analyse-services/import',
+]
 
 export type ActionState = { error?: string; success?: string }
 
@@ -92,6 +96,74 @@ export async function saveRemunerationPoire(
   if (error) return { error: error.message }
   revalidate()
   return { success: 'Complément enregistré.' }
+}
+
+// ─── Import de la Poire depuis la mini-app Scoubidoo ───
+// Lit directement la vue `scd_v_caisse_calc` (même source que l'export CSV de
+// scoubidoo-caisse) et upserte dans `ana_poire_daily` : plus besoin de passer
+// par un CSV. Idempotent (PK = jour), plusieurs services d'un même jour sommés.
+
+type CaisseRow = { date: string; poire: number | null; tag_name: string | null }
+
+export async function importPoireFromScoubidoo(): Promise<ActionState> {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) return { error: 'Non authentifié.' }
+
+  const { data, error } = await supabase
+    .from('scd_v_caisse_calc')
+    .select('date,poire,tag_name')
+    .order('date', { ascending: true })
+  if (error) return { error: `Lecture Scoubidoo : ${error.message}` }
+
+  const rows = (data as unknown as CaisseRow[]) ?? []
+  const byDay: Record<string, { montant: number; tag: string | null }> = {}
+  for (const r of rows) {
+    const montant = Number(r.poire) || 0
+    if (!r.date || !montant) continue
+    const cur = (byDay[r.date] ||= { montant: 0, tag: null })
+    cur.montant += montant
+    if (!cur.tag && r.tag_name) cur.tag = r.tag_name
+  }
+
+  const poire = Object.entries(byDay).map(([jour, v]) => ({
+    jour,
+    montant_ttc: v.montant,
+    tag: v.tag,
+    source_file: 'scoubidoo (base)',
+  }))
+
+  if (poire.length === 0) {
+    return { error: 'Aucune Poire trouvée dans la caisse Scoubidoo.' }
+  }
+
+  for (let i = 0; i < poire.length; i += 500) {
+    const { error: e } = await supabase
+      .from('ana_poire_daily')
+      .upsert(poire.slice(i, i + 500), { onConflict: 'jour' })
+    if (e) return { error: `Écriture : ${e.message}` }
+  }
+
+  await supabase.from('ana_import_log').insert({
+    kind: 'poire',
+    file_name: 'scoubidoo (base)',
+    rows_in: rows.length,
+    poire_upserted: poire.length,
+  })
+
+  const total = poire.reduce((s, p) => s + p.montant_ttc, 0)
+  revalidate()
+  return {
+    success: `${poire.length} jour${poire.length > 1 ? 's' : ''} de Poire importé${
+      poire.length > 1 ? 's' : ''
+    } depuis Scoubidoo — ${total.toLocaleString('fr-FR', {
+      style: 'currency',
+      currency: 'EUR',
+      maximumFractionDigits: 0,
+    })}.`,
+  }
 }
 
 // ─── Paramètres ───

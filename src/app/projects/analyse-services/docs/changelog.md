@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-08-02 — Import direct de la Poire depuis Scoubidoo
+- Bouton **« Importer la Poire »** sur la page Importation : lit directement la
+  vue `scd_v_caisse_calc` de la mini-app Scoubidoo (même source que son export
+  CSV) et upserte dans `ana_poire_daily`. Plus besoin d'exporter/ré-importer un
+  CSV. Idempotent, ré-exécutable, journalisé dans `ana_import_log`.
+
 ## 2026-08-01 — Onglets & module « Coûts salariaux »
 - **Onglets** : Revenus caisse · Coûts salariaux · Coûts appro · Autres coûts ·
   Synthèse · Importation (en-tête partagé `PageHeader` + `TabBar`, `?tab=`).
