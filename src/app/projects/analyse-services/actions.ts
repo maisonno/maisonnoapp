@@ -2,7 +2,13 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
-import { comboConfigured, probeCombo, type ProbeResult } from './lib/combo'
+import {
+  comboConfigured,
+  fetchComboSpec,
+  probeCombo,
+  type ProbeResult,
+  type SpecSummary,
+} from './lib/combo'
 
 const PATHS = [
   '/projects/analyse-services',
@@ -199,6 +205,36 @@ export async function testComboConnection(
   const path = String(formData.get('path') ?? '').trim() || 'v1/employees'
   const results = await probeCombo(path)
   return { configured: true, results }
+}
+
+export type ComboSpecState = {
+  error?: string
+  spec?: SpecSummary
+  tried?: { url: string; status: number | null; note: string }[]
+}
+
+// Fait récupérer la spec OpenAPI par le serveur (le sandbox de dev ne peut pas
+// joindre Combo), la parse et n'en renvoie qu'un résumé exploitable.
+export async function loadComboSpec(
+  _prev: ComboSpecState,
+  formData: FormData,
+): Promise<ComboSpecState> {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) return { error: 'Non authentifié.' }
+
+  const url = String(formData.get('url') ?? '').trim() || undefined
+  const { spec, tried } = await fetchComboSpec(url)
+  if (!spec) {
+    return {
+      tried,
+      error:
+        "Spec OpenAPI introuvable à ces adresses. Ouvre la page Swagger dans ton navigateur, repère l'URL du fichier JSON (onglet Réseau des outils de développement) et colle-la ci-dessus.",
+    }
+  }
+  return { spec, tried }
 }
 
 // ─── Paramètres ───

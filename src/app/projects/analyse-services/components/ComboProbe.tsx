@@ -1,7 +1,12 @@
 'use client'
 
 import { useActionState } from 'react'
-import { testComboConnection, type ComboProbeState } from '../actions'
+import {
+  loadComboSpec,
+  testComboConnection,
+  type ComboProbeState,
+  type ComboSpecState,
+} from '../actions'
 
 const SUGGESTIONS = ['v1/employees', 'v1/contracts', 'v1/shifts', 'employees', 'api/v1/employees']
 
@@ -14,6 +19,8 @@ export default function ComboProbe() {
       <div className="h2">
         Connexion ComboHR <span className="tag">diagnostic</span>
       </div>
+
+      <ComboSpec />
 
       <form action={action} className="frm">
         <div style={{ gridColumn: '1 / -1' }}>
@@ -79,5 +86,101 @@ export default function ComboProbe() {
         </div>
       )}
     </section>
+  )
+}
+
+// ─── Récupération de la spec OpenAPI (exécutée par le serveur) ───
+
+function ComboSpec() {
+  const [state, action, pending] = useActionState(loadComboSpec, {} as ComboSpecState)
+  const spec = state.spec
+
+  return (
+    <div style={{ marginBottom: 22 }}>
+      <form action={action} className="frm">
+        <div style={{ gridColumn: '1 / -1' }}>
+          <label>URL de la spec OpenAPI (vide = essayer les emplacements habituels)</label>
+          <input name="url" placeholder="https://partner.combohr.com/swagger.json" />
+        </div>
+        <div>
+          <button className="btn btn-primary" type="submit" disabled={pending}>
+            {pending ? 'Récupération…' : 'Récupérer la documentation'}
+          </button>
+        </div>
+      </form>
+
+      {state.error && <div className="msg-err">{state.error}</div>}
+
+      {spec && (
+        <>
+          <div className="msg-ok">
+            ✅ {spec.title ?? 'API'} {spec.version ? `v${spec.version}` : ''} — {spec.endpoints.length}{' '}
+            endpoint(s) · source <code>{spec.url}</code>
+          </div>
+          <div className="foot" style={{ marginTop: 0, marginBottom: 10 }}>
+            <b>Serveurs :</b> {spec.servers.join(', ') || '—'}
+            <br />
+            <b>Authentification :</b>{' '}
+            {spec.security.length
+              ? spec.security
+                  .map((s) => `${s.name} (${s.type}${s.in ? `, in: ${s.in}` : ''}${s.scheme ? `, ${s.scheme}` : ''})`)
+                  .join(' · ')
+              : '—'}
+          </div>
+          <div className="daily">
+            <table className="day">
+              <thead>
+                <tr>
+                  <th>Méthode</th>
+                  <th>Chemin</th>
+                  <th>Description</th>
+                </tr>
+              </thead>
+              <tbody>
+                {spec.endpoints.map((e, i) => (
+                  <tr key={i}>
+                    <td>{e.method}</td>
+                    <td>
+                      <code style={{ fontSize: 12 }}>{e.path}</code>
+                    </td>
+                    <td style={{ color: 'var(--ink-soft)' }}>{e.summary ?? '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {spec.schemas.length > 0 && (
+            <div className="foot">
+              <b>Objets exposés :</b> {spec.schemas.join(', ')}
+            </div>
+          )}
+        </>
+      )}
+
+      {!spec && state.tried && state.tried.length > 0 && (
+        <div className="daily">
+          <table className="day">
+            <thead>
+              <tr>
+                <th>URL testée</th>
+                <th>Statut</th>
+                <th>Note</th>
+              </tr>
+            </thead>
+            <tbody>
+              {state.tried.map((t, i) => (
+                <tr key={i}>
+                  <td>
+                    <code style={{ fontSize: 11, wordBreak: 'break-all' }}>{t.url}</code>
+                  </td>
+                  <td>{t.status ?? '—'}</td>
+                  <td style={{ color: 'var(--ink-soft)', fontSize: 12 }}>{t.note}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
   )
 }
