@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import type {
   Contrat,
+  HeuresMois,
   LaborEmploye,
   LaborRow,
   PoireDay,
@@ -90,6 +91,19 @@ export async function getContrats(): Promise<Contrat[]> {
     return []
   }
   return (data as unknown as Contrat[]) ?? []
+}
+
+export async function getHeuresMois(): Promise<HeuresMois[]> {
+  const supabase = await createClient()
+  const { data, error } = await supabase
+    .from('ana_heures_mois')
+    .select('contrat_id,mois,heures_reelles,heures_planifiees,supp_equiv_reel,supp_equiv_planifie')
+    .order('mois', { ascending: true })
+  if (error) {
+    console.error('[ana] getHeuresMois error:', error.code, error.message)
+    return []
+  }
+  return (data as unknown as HeuresMois[]) ?? []
 }
 
 export async function getRemunerationPoire(): Promise<RemunerationPoire[]> {

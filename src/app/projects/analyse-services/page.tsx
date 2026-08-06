@@ -6,6 +6,7 @@ import {
   getAllPoire,
   getAllTicketMetrics,
   getContrats,
+  getHeuresMois,
   getParam,
   getPinsaMonthly,
   getRemunerationPoire,
@@ -34,10 +35,11 @@ export default async function AnalyseServicesPage({
 
   // ─── Onglet Coûts salariaux ───
   if (tab === 'salaires') {
-    const [tickets, labor, contrats, remPoire, tauxCharges] = await Promise.all([
+    const [tickets, labor, contrats, heures, remPoire, tauxCharges] = await Promise.all([
       getAllTicketMetrics(),
       getAllLabor(),
       getContrats(),
+      getHeuresMois(),
       getRemunerationPoire(),
       getParam('taux_charges_patronales', 0.3),
     ])
@@ -64,6 +66,7 @@ export default async function AnalyseServicesPage({
         <CoutsSalariaux
           labor={labor}
           contrats={contrats}
+          heures={heures}
           remPoire={remPoire}
           tauxCharges={tauxCharges}
           annee={anneeActive}

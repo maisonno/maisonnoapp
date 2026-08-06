@@ -1,6 +1,7 @@
 import Link from 'next/link'
-import type { Contrat, LaborRow, RemunerationPoire } from '../lib/types'
+import type { Contrat, HeuresMois, LaborRow, RemunerationPoire } from '../lib/types'
 import {
+  aggregateFromCombo,
   coutGlobal,
   heuresRealiseesByMonth,
   labelOfYm,
@@ -15,6 +16,7 @@ import { EUR, N1, PCT } from '../lib/format'
 type Props = {
   labor: LaborRow[]
   contrats: Contrat[]
+  heures: HeuresMois[]
   remPoire: RemunerationPoire[]
   tauxCharges: number
   annee: string
@@ -25,6 +27,7 @@ type Props = {
 export default function CoutsSalariaux({
   labor,
   contrats,
+  heures,
   remPoire,
   tauxCharges,
   annee,
@@ -32,10 +35,31 @@ export default function CoutsSalariaux({
   caByMonth,
 }: Props) {
   const months = monthsOfYear(annee)
-  const real = realiseByMonth(labor)
-  const realH = heuresRealiseesByMonth(labor)
-  const prev = prevByMonth(contrats, months)
-  const prevH = prevHeuresByMonth(contrats, months)
+
+  // Source privilégiée : ComboHR (plannings synchronisés). Repli sur l'import
+  // fichier (ana_labor) pour les mois non couverts par la synchro.
+  const combo = aggregateFromCombo(contrats, heures, 'reel')
+  const comboPrev = aggregateFromCombo(contrats, heures, 'planifie')
+  const fileReal = realiseByMonth(labor)
+  const fileRealH = heuresRealiseesByMonth(labor)
+
+  const real: typeof fileReal = { ...fileReal }
+  const realH: Record<string, number> = { ...fileRealH }
+  for (const ym of combo.months) {
+    real[ym] = combo.brut[ym]
+    realH[ym] = combo.heures[ym] ?? 0
+  }
+
+  // Prévisionnel : planning Combo si disponible, sinon heures hebdo cible
+  const prevCible = prevByMonth(contrats, months)
+  const prevHCible = prevHeuresByMonth(contrats, months)
+  const prev: typeof prevCible = { ...prevCible }
+  const prevH: Record<string, number> = { ...prevHCible }
+  for (const ym of comboPrev.months) {
+    prev[ym] = comboPrev.brut[ym]
+    prevH[ym] = comboPrev.heures[ym] ?? 0
+  }
+
   const poire = poireByMonth(remPoire)
 
   // Totaux annuels
@@ -192,9 +216,9 @@ export default function CoutsSalariaux({
           </table>
         </div>
         <div className="foot">
-          <b>Réalisé</b> : à partir des imports Combo (export comptable). <b>Prévisionnel</b> : à partir des
-          contrats saisis dans la zone Détail (salaire brut + heures hebdo cible), au prorata de la période de
-          contrat. Coût global = brut × (1 + {PCT(tauxCharges * 100)} de charges patronales) + complément
+          <b>Réalisé</b> : heures réellement pointées dans ComboHR, valorisées au salaire du contrat.{' '}
+          <b>Prévisionnel</b> : planning ComboHR quand il existe, sinon heures hebdo cible saisies dans la zone
+          Détail, au prorata de la période de contrat. Coût global = brut × (1 + {PCT(tauxCharges * 100)} de charges patronales) + complément
           « Poire » (cash, <b>non soumis aux charges</b>). Le brut inclut la majoration des heures supp, les
           fériés, le 6ème jour payé et la provision congés payés. Estimation de gestion, pas un calcul de paie.
           {contrats.length === 0 ? (

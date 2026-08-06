@@ -1,5 +1,19 @@
 # Changelog
 
+## 2026-08-02 — Connecteur ComboHR Partner API (remplace l'import fichier)
+- **Synchronisation** depuis `https://partner.combohr.com/api/v1` (auth Bearer) :
+  `/locations`, `/contracts` (+ `/past_contracts`), `/plannings`.
+- Récupère les **contrats** (nom, fonction, dates, heures hebdo et **salaire brut
+  mensuel** — plus besoin de le saisir) et les **plannings** : heures
+  **planifiées** et heures **réellement pointées**.
+- Migration `0017` : `ana_heures_mois` (heures réelles/planifiées + équivalent
+  majoration heures supp par mois), `ana_contrats.combo_contract_id`,
+  `ana_params.valeur_texte`. Idempotent ; les saisies manuelles (heures cible,
+  compléments Poire) sont préservées.
+- Le calcul du **réalisé** et du **prévisionnel** s'appuie désormais sur Combo,
+  avec repli sur l'import fichier pour les mois non couverts. Majoration des
+  heures supp calculée **semaine par semaine** au barème CHR.
+
 ## 2026-08-02 — Noms des salariés + amorce connecteur ComboHR
 - **Noms conservés à l'import** (migration `0016`) : `ana_labor.nom` / `.prenom`.
   `employe_hash` reste la clé d'idempotence. Les noms ne sont exposés que dans

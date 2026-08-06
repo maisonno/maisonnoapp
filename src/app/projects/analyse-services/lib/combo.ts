@@ -1,235 +1,164 @@
-// Client HTTP ComboHR — strictement côté serveur (importé uniquement depuis
-// actions.ts, marqué 'use server').
-// La clé (COMBO_API_KEY) donne accès à TOUT le compte (salaires, n° de sécu) :
+// Client ComboHR Partner API — strictement côté serveur.
+// La clé (COMBO_API_KEY) donne accès à tout le compte (salaires, n° de sécu) :
 // elle ne doit jamais être exposée au navigateur ni renvoyée dans une réponse.
 //
-// La documentation de la « Partner API » n'étant pas publique, la base d'URL et
-// le schéma d'authentification sont découverts par sondage (voir probeCombo)
-// puis figés via les variables d'environnement COMBO_API_BASE_URL et
-// COMBO_AUTH_SCHEME.
+// Spec : ComboHR Partner API v1 — auth `doorkeeper` (http bearer),
+// serveur `https://partner.combohr.com`, préfixe `/api/v1`.
+
+export const COMBO_BASE = process.env.COMBO_API_BASE_URL ?? 'https://partner.combohr.com'
 
 export const comboKey = () => process.env.COMBO_API_KEY ?? ''
 export const comboConfigured = () => comboKey().length > 0
 
-export const BASE_CANDIDATES = [
-  'https://partner.combohr.com',
-  'https://api.combohr.com',
-  'https://api.snapshift.co',
-  'https://app.combohr.com/api',
-]
+// ─── Types (sous-ensemble utile de la spec) ───
 
-// Emplacements habituels de la spec OpenAPI derrière une UI Swagger
-export const SPEC_CANDIDATES = [
-  'https://partner.combohr.com/swagger.json',
-  'https://partner.combohr.com/swagger/v1/swagger.json',
-  'https://partner.combohr.com/openapi.json',
-  'https://partner.combohr.com/v3/api-docs',
-  'https://partner.combohr.com/swagger/doc.json',
-  'https://partner.combohr.com/api-docs',
-]
+export type ComboTeam = { id: string; name: string }
+export type ComboLocation = {
+  id: string
+  name: string
+  account_id?: string
+  teams?: ComboTeam[]
+}
 
-export const AUTH_SCHEMES = ['bearer', 'x-api-key', 'api-key', 'authorization-raw'] as const
-export type AuthScheme = (typeof AUTH_SCHEMES)[number]
+export type ComboContract = {
+  id: string
+  original_contract_id?: string | null
+  firstname?: string | null
+  lastname?: string | null
+  contract_type?: string | null
+  contract_time?: number | null // heures hebdo contractuelles
+  working_days_in_week?: number | null
+  function?: string | null // intitulé de poste
+  location_id?: string | null
+  start_date?: string | null
+  end_date?: string | null
+  hourly_gross_rate?: number | null // coût horaire chargé (calculé par Combo)
+  monthly_gross_salary?: number | null
+  hourly_gross_salary?: number | null
+  daily_worker?: boolean
+  employee_number?: string | null
+}
 
-export function authHeaders(scheme: AuthScheme, key: string): Record<string, string> {
-  switch (scheme) {
-    case 'bearer':
-      return { Authorization: `Bearer ${key}` }
-    case 'x-api-key':
-      return { 'X-Api-Key': key }
-    case 'api-key':
-      return { 'Api-Key': key }
-    case 'authorization-raw':
-      return { Authorization: key }
+export type ComboPlanning = {
+  id: string
+  contract_id?: string | null
+  date: string
+  starts_at: string
+  ends_at: string
+  break_duration?: number | null // minutes
+  real_starts_at?: string | null
+  real_ends_at?: string | null
+  real_break_duration?: number | null
+  firstname?: string | null
+  lastname?: string | null
+  location_id?: string
+  team_id?: string | null
+}
+
+// ─── Appels ───
+
+export class ComboError extends Error {
+  constructor(
+    message: string,
+    readonly status?: number,
+  ) {
+    super(message)
   }
 }
 
-export type ProbeResult = {
-  base: string
-  scheme: AuthScheme
-  path: string
-  status: number | null
-  ok: boolean
-  contentType: string | null
-  excerpt: string
-  error?: string
+function scrub(text: string, key: string) {
+  return key ? text.split(key).join('«CLÉ MASQUÉE»') : text
 }
 
-// Retire toute occurrence de la clé d'un texte, par précaution.
-function scrub(text: string, key: string): string {
-  if (!key) return text
-  return text.split(key).join('«CLÉ MASQUÉE»')
-}
+async function comboGet<T>(path: string, params: Record<string, string | undefined> = {}): Promise<T> {
+  const key = comboKey()
+  if (!key) throw new ComboError('COMBO_API_KEY absente côté serveur.')
 
-async function callOnce(
-  base: string,
-  scheme: AuthScheme,
-  path: string,
-  key: string,
-  timeoutMs = 8000,
-): Promise<ProbeResult> {
-  const url = `${base.replace(/\/+$/, '')}/${path.replace(/^\/+/, '')}`
+  const url = new URL(`${COMBO_BASE.replace(/\/+$/, '')}/api/v1/${path.replace(/^\/+/, '')}`)
+  for (const [k, v] of Object.entries(params)) if (v) url.searchParams.set(k, v)
+
+  let res: Response
   try {
-    const res = await fetch(url, {
-      headers: { Accept: 'application/json', ...authHeaders(scheme, key) },
-      signal: AbortSignal.timeout(timeoutMs),
+    res = await fetch(url, {
+      headers: { Accept: 'application/json', Authorization: `Bearer ${key}` },
+      signal: AbortSignal.timeout(20000),
       cache: 'no-store',
     })
-    const raw = await res.text()
-    return {
-      base,
-      scheme,
-      path,
-      status: res.status,
-      ok: res.ok,
-      contentType: res.headers.get('content-type'),
-      excerpt: scrub(raw.slice(0, 1200), key),
-    }
   } catch (e) {
-    return {
-      base,
-      scheme,
-      path,
-      status: null,
-      ok: false,
-      contentType: null,
-      excerpt: '',
-      error: scrub((e as Error).message, key),
-    }
+    throw new ComboError(`Appel ${path} : ${scrub((e as Error).message, key)}`)
+  }
+
+  const text = await res.text()
+  if (!res.ok) {
+    const hint =
+      res.status === 401 || res.status === 403
+        ? ' (clé refusée : vérifie COMBO_API_KEY et les droits du compte partenaire)'
+        : ''
+    throw new ComboError(`${path} → HTTP ${res.status}${hint}. ${scrub(text.slice(0, 200), key)}`, res.status)
+  }
+  try {
+    return JSON.parse(text) as T
+  } catch {
+    throw new ComboError(`${path} : réponse non-JSON.`)
   }
 }
 
-// Sonde les combinaisons base × schéma d'auth sur un chemin donné.
-// S'arrête dès qu'une combinaison répond 2xx.
-export async function probeCombo(path: string): Promise<ProbeResult[]> {
-  const key = comboKey()
-  if (!key) return []
-  const results: ProbeResult[] = []
-  for (const base of BASE_CANDIDATES) {
-    for (const scheme of AUTH_SCHEMES) {
-      const r = await callOnce(base, scheme, path, key)
-      results.push(r)
-      if (r.ok) return results // combinaison trouvée
-      // Inutile de tester les autres schémas si l'hôte est injoignable
-      if (r.error && /ENOTFOUND|EAI_AGAIN|ECONNREFUSED/.test(r.error)) break
-    }
+export const getLocations = () => comboGet<ComboLocation[]>('locations')
+
+// Contrats actifs à une date donnée sur un établissement
+export const getContracts = (locationId: string, day?: string) =>
+  comboGet<ComboContract[]>('contracts', { location_id: locationId, day })
+
+// Contrats terminés sur une plage (paginé, 50/page)
+export async function getPastContracts(
+  locationId: string,
+  startDate: string,
+  endDate: string,
+): Promise<ComboContract[]> {
+  const out: ComboContract[] = []
+  for (let page = 1; page <= 40; page++) {
+    const res = await comboGet<{
+      contracts?: ComboContract[]
+      meta?: { has_next_page?: boolean }
+    } | null>('past_contracts', {
+      location_id: locationId,
+      start_date: startDate,
+      end_date: endDate,
+      page: String(page),
+    })
+    const batch = res?.contracts ?? []
+    out.push(...batch)
+    if (!res?.meta?.has_next_page || batch.length === 0) break
   }
-  return results
+  return out
 }
 
-// ─── Récupération de la spec OpenAPI ───
-// Le sandbox de développement ne peut pas joindre Combo : c'est le serveur de
-// production qui va chercher la spec, la parse et n'en renvoie qu'un résumé.
+// Shifts sur une plage. L'API accepte de larges plages ; on découpe par mois
+// pour rester dans des réponses raisonnables.
+export const getPlannings = (startDate: string, endDate: string, locationId?: string) =>
+  comboGet<ComboPlanning[]>('plannings', {
+    start_date: startDate,
+    end_date: endDate,
+    location_id: locationId,
+  })
 
-export type SpecSummary = {
-  url: string
-  title?: string
-  version?: string
-  servers: string[]
-  security: { name: string; type: string; in?: string; scheme?: string }[]
-  endpoints: { method: string; path: string; summary?: string }[]
-  schemas: string[]
+// ─── Helpers de calcul ───
+
+// Durée d'un shift en heures, pauses déduites. `real` = pointages réels.
+export function shiftHours(p: ComboPlanning, real: boolean): number {
+  const s = real ? p.real_starts_at : p.starts_at
+  const e = real ? p.real_ends_at : p.ends_at
+  const brk = (real ? p.real_break_duration : p.break_duration) ?? 0
+  if (!s || !e) return 0
+  const ms = new Date(e).getTime() - new Date(s).getTime()
+  if (!isFinite(ms) || ms <= 0) return 0
+  return Math.max(0, ms / 3600000 - brk / 60)
 }
 
-type OpenApiDoc = {
-  info?: { title?: string; version?: string }
-  servers?: { url?: string }[]
-  host?: string
-  basePath?: string
-  schemes?: string[]
-  paths?: Record<string, Record<string, { summary?: string; description?: string }>>
-  components?: {
-    securitySchemes?: Record<string, { type?: string; in?: string; name?: string; scheme?: string }>
-    schemas?: Record<string, unknown>
-  }
-  securityDefinitions?: Record<string, { type?: string; in?: string; name?: string }>
-  definitions?: Record<string, unknown>
-}
-
-function summarizeSpec(url: string, doc: OpenApiDoc): SpecSummary {
-  const servers = (doc.servers ?? []).map((s) => s.url ?? '').filter(Boolean)
-  if (servers.length === 0 && doc.host) {
-    const scheme = doc.schemes?.[0] ?? 'https'
-    servers.push(`${scheme}://${doc.host}${doc.basePath ?? ''}`)
-  }
-
-  const secSrc = doc.components?.securitySchemes ?? doc.securityDefinitions ?? {}
-  const security = Object.entries(secSrc).map(([k, v]) => ({
-    name: v?.name ?? k,
-    type: v?.type ?? '?',
-    in: v?.in,
-    scheme: (v as { scheme?: string })?.scheme,
-  }))
-
-  const endpoints: SpecSummary['endpoints'] = []
-  for (const [p, ops] of Object.entries(doc.paths ?? {})) {
-    for (const [method, op] of Object.entries(ops ?? {})) {
-      if (!['get', 'post', 'put', 'patch', 'delete'].includes(method.toLowerCase())) continue
-      endpoints.push({
-        method: method.toUpperCase(),
-        path: p,
-        summary: op?.summary ?? op?.description?.slice(0, 120),
-      })
-    }
-  }
-  endpoints.sort((a, b) => a.path.localeCompare(b.path) || a.method.localeCompare(b.method))
-
-  const schemas = Object.keys(doc.components?.schemas ?? doc.definitions ?? {})
-
-  return {
-    url,
-    title: doc.info?.title,
-    version: doc.info?.version,
-    servers,
-    security,
-    endpoints,
-    schemas,
-  }
-}
-
-export async function fetchComboSpec(
-  explicitUrl?: string,
-): Promise<{ spec?: SpecSummary; tried: { url: string; status: number | null; note: string }[] }> {
-  const key = comboKey()
-  const urls = explicitUrl ? [explicitUrl] : SPEC_CANDIDATES
-  const tried: { url: string; status: number | null; note: string }[] = []
-
-  for (const url of urls) {
-    // Avec puis sans authentification (certaines specs sont publiques)
-    for (const headers of [
-      { Accept: 'application/json', ...(key ? authHeaders('bearer', key) : {}) },
-      { Accept: 'application/json' },
-    ]) {
-      try {
-        const res = await fetch(url, {
-          headers,
-          signal: AbortSignal.timeout(12000),
-          cache: 'no-store',
-        })
-        const text = await res.text()
-        if (!res.ok) {
-          tried.push({ url, status: res.status, note: scrub(text.slice(0, 120), key) })
-          continue
-        }
-        try {
-          const doc = JSON.parse(text) as OpenApiDoc
-          if (doc.paths) return { spec: summarizeSpec(url, doc), tried }
-          tried.push({ url, status: res.status, note: 'JSON sans champ "paths"' })
-        } catch {
-          tried.push({ url, status: res.status, note: 'réponse non-JSON (page HTML ?)' })
-        }
-      } catch (e) {
-        tried.push({ url, status: null, note: scrub((e as Error).message, key) })
-      }
-    }
-  }
-  return { tried }
-}
-
-// Appel direct une fois la base et le schéma connus (via variables d'env).
-export async function comboGet(path: string): Promise<ProbeResult> {
-  const key = comboKey()
-  const base = process.env.COMBO_API_BASE_URL ?? BASE_CANDIDATES[0]
-  const scheme = (process.env.COMBO_AUTH_SCHEME as AuthScheme) ?? 'bearer'
-  return callOnce(base, scheme, path, key)
+// Clé de semaine ISO (lundi) d'une date 'YYYY-MM-DD'
+export function isoWeekKey(day: string): string {
+  const d = new Date(`${day}T00:00:00Z`)
+  const dow = (d.getUTCDay() + 6) % 7 // 0 = lundi
+  d.setUTCDate(d.getUTCDate() - dow)
+  return d.toISOString().slice(0, 10)
 }
