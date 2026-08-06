@@ -121,7 +121,7 @@ export async function getLaborEmployes(): Promise<LaborEmploye[]> {
   const supabase = await createClient()
   const { data, error } = await supabase
     .from('ana_labor')
-    .select('employe_hash,poste,contrat,salaire_base')
+    .select('employe_hash,nom,prenom,poste,contrat,salaire_base')
     .order('periode', { ascending: false })
   if (error) {
     console.error('[ana] getLaborEmployes error:', error.code, error.message)
