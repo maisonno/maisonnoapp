@@ -223,7 +223,10 @@ function Detail({ labor, contrats, remPoire, employes, tauxCharges, annee, annee
               <option value="">— aucun —</option>
               {employes.map((e) => (
                 <option key={e.employe_hash} value={e.employe_hash}>
-                  {e.poste ?? '?'} · {e.contrat ?? '?'} · {EUR(e.salaire_base)}
+                  {e.prenom || e.nom
+                    ? `${e.prenom ?? ''} ${e.nom ?? ''}`.trim()
+                    : `${e.poste ?? '?'} · ${e.contrat ?? '?'}`}{' '}
+                  · {EUR(e.salaire_base)}
                 </option>
               ))}
             </select>

@@ -1,5 +1,15 @@
 # Changelog
 
+## 2026-08-02 — Noms des salariés + amorce connecteur ComboHR
+- **Noms conservés à l'import** (migration `0016`) : `ana_labor.nom` / `.prenom`.
+  `employe_hash` reste la clé d'idempotence. Les noms ne sont exposés que dans
+  la zone Détail (protégée) et rendent le rattachement des contrats immédiat.
+- **Diagnostic ComboHR** (`lib/combo.ts` + bloc sur la page Importation) : la
+  doc de la Partner API n'étant pas publique, un sondage identifie depuis la
+  prod la bonne base d'URL et le bon schéma d'authentification, et affiche un
+  extrait des réponses. La clé (`COMBO_API_KEY`) reste strictement serveur.
+- ⏳ L'import via API remplacera l'import fichier une fois le mapping connu.
+
 ## 2026-08-02 — Import direct de la Poire depuis Scoubidoo
 - Bouton **« Importer la Poire »** sur la page Importation : lit directement la
   vue `scd_v_caisse_calc` de la mini-app Scoubidoo (même source que son export

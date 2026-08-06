@@ -358,6 +358,8 @@ export function parseComboSynthese(wb: XLSX.WorkBook, fname: string): ComboParse
     byHash[employe_hash] = {
       periode: periodeDate,
       employe_hash,
+      nom,
+      prenom,
       poste: iPoste >= 0 && row[iPoste] != null ? String(row[iPoste]).trim() : null,
       contrat,
       salaire_base: base,

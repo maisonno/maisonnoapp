@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { getImportLog } from '../lib/queries'
 import ImportClient from '../components/ImportClient'
 import ImportPoireScoubidoo from '../components/ImportPoireScoubidoo'
+import ComboProbe from '../components/ComboProbe'
 import PageHeader from '../components/PageHeader'
 
 export const metadata = { title: 'Import — Analyse des services' }
@@ -32,6 +33,8 @@ export default async function ImportPage() {
       <ImportClient />
 
       <ImportPoireScoubidoo />
+
+      <ComboProbe />
 
       <section>
         <div className="h2">Journal des imports</div>

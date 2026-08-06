@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
+import { comboConfigured, probeCombo, type ProbeResult } from './lib/combo'
 
 const PATHS = [
   '/projects/analyse-services',
@@ -164,6 +165,40 @@ export async function importPoireFromScoubidoo(): Promise<ActionState> {
       maximumFractionDigits: 0,
     })}.`,
   }
+}
+
+// ─── ComboHR : diagnostic de connexion ───
+// La doc de la Partner API n'est pas publique : on sonde depuis la prod pour
+// identifier la bonne base d'URL + le bon schéma d'authentification, puis la
+// forme des réponses. La clé ne quitte jamais le serveur.
+
+export type ComboProbeState = {
+  error?: string
+  configured?: boolean
+  results?: ProbeResult[]
+}
+
+export async function testComboConnection(
+  _prev: ComboProbeState,
+  formData: FormData,
+): Promise<ComboProbeState> {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) return { error: 'Non authentifié.' }
+
+  if (!comboConfigured()) {
+    return {
+      configured: false,
+      error:
+        "COMBO_API_KEY n'est pas définie. Ajoute-la dans Vercel → Settings → Environment Variables (sans préfixe NEXT_PUBLIC_), puis redéploie.",
+    }
+  }
+
+  const path = String(formData.get('path') ?? '').trim() || 'v1/employees'
+  const results = await probeCombo(path)
+  return { configured: true, results }
 }
 
 // ─── Paramètres ───

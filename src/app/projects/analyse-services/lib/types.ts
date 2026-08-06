@@ -77,9 +77,11 @@ export type RemunerationPoire = {
   montant: number
 }
 
-// Salarié anonyme issu de l'import Combo (pour rattacher un contrat)
+// Salarié issu de l'import Combo (pour rattacher un contrat)
 export type LaborEmploye = {
   employe_hash: string
+  nom: string | null
+  prenom: string | null
   poste: string | null
   contrat: string | null
   salaire_base: number
@@ -133,6 +135,8 @@ export type PoireUpsertRow = {
 export type LaborUpsertRow = {
   periode: string
   employe_hash: string
+  nom: string | null
+  prenom: string | null
   poste: string | null
   contrat: string | null
   salaire_base: number
