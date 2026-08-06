@@ -70,6 +70,16 @@ export type Contrat = {
   actif: boolean
 }
 
+// Heures mensuelles synchronisées depuis les plannings ComboHR
+export type HeuresMois = {
+  contrat_id: string
+  mois: string // 'YYYY-MM-DD' (1er du mois)
+  heures_reelles: number
+  heures_planifiees: number
+  supp_equiv_reel: number
+  supp_equiv_planifie: number
+}
+
 export type RemunerationPoire = {
   id: string
   contrat_id: string

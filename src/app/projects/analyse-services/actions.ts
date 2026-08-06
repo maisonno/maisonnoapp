@@ -2,13 +2,8 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
-import {
-  comboConfigured,
-  fetchComboSpec,
-  probeCombo,
-  type ProbeResult,
-  type SpecSummary,
-} from './lib/combo'
+import { comboConfigured, getLocations } from './lib/combo'
+import { syncCombo, type SyncReport } from './lib/combo-sync'
 
 const PATHS = [
   '/projects/analyse-services',
@@ -173,68 +168,72 @@ export async function importPoireFromScoubidoo(): Promise<ActionState> {
   }
 }
 
-// ─── ComboHR : diagnostic de connexion ───
-// La doc de la Partner API n'est pas publique : on sonde depuis la prod pour
-// identifier la bonne base d'URL + le bon schéma d'authentification, puis la
-// forme des réponses. La clé ne quitte jamais le serveur.
+// ─── ComboHR : établissements & synchronisation ───
 
-export type ComboProbeState = {
+const NOT_CONFIGURED =
+  "COMBO_API_KEY n'est pas définie côté serveur. Ajoute-la dans Vercel → Settings → Environment Variables (sans préfixe NEXT_PUBLIC_), puis redéploie."
+
+export type ComboLocationsState = {
   error?: string
-  configured?: boolean
-  results?: ProbeResult[]
+  locations?: { id: string; name: string }[]
+  selected?: string | null
 }
 
-export async function testComboConnection(
-  _prev: ComboProbeState,
-  formData: FormData,
-): Promise<ComboProbeState> {
+export async function loadComboLocations(): Promise<ComboLocationsState> {
   const supabase = await createClient()
   const {
     data: { user },
   } = await supabase.auth.getUser()
   if (!user) return { error: 'Non authentifié.' }
+  if (!comboConfigured()) return { error: NOT_CONFIGURED }
 
-  if (!comboConfigured()) {
+  try {
+    const locs = await getLocations()
+    const { data } = await supabase
+      .from('ana_params')
+      .select('valeur_texte')
+      .eq('cle', 'combo_location_id')
+      .maybeSingle()
     return {
-      configured: false,
-      error:
-        "COMBO_API_KEY n'est pas définie. Ajoute-la dans Vercel → Settings → Environment Variables (sans préfixe NEXT_PUBLIC_), puis redéploie.",
+      locations: locs.map((l) => ({ id: l.id, name: l.name })),
+      selected: (data as { valeur_texte: string | null } | null)?.valeur_texte ?? null,
     }
+  } catch (e) {
+    return { error: (e as Error).message }
   }
-
-  const path = String(formData.get('path') ?? '').trim() || 'v1/employees'
-  const results = await probeCombo(path)
-  return { configured: true, results }
 }
 
-export type ComboSpecState = {
-  error?: string
-  spec?: SpecSummary
-  tried?: { url: string; status: number | null; note: string }[]
-}
+export type ComboSyncState = { error?: string; report?: SyncReport }
 
-// Fait récupérer la spec OpenAPI par le serveur (le sandbox de dev ne peut pas
-// joindre Combo), la parse et n'en renvoie qu'un résumé exploitable.
-export async function loadComboSpec(
-  _prev: ComboSpecState,
+export async function syncComboAction(
+  _prev: ComboSyncState,
   formData: FormData,
-): Promise<ComboSpecState> {
+): Promise<ComboSyncState> {
   const supabase = await createClient()
   const {
     data: { user },
   } = await supabase.auth.getUser()
   if (!user) return { error: 'Non authentifié.' }
+  if (!comboConfigured()) return { error: NOT_CONFIGURED }
 
-  const url = String(formData.get('url') ?? '').trim() || undefined
-  const { spec, tried } = await fetchComboSpec(url)
-  if (!spec) {
-    return {
-      tried,
-      error:
-        "Spec OpenAPI introuvable à ces adresses. Ouvre la page Swagger dans ton navigateur, repère l'URL du fichier JSON (onglet Réseau des outils de développement) et colle-la ci-dessus.",
-    }
+  const locationId = String(formData.get('location_id') ?? '').trim()
+  const locationName = String(formData.get('location_name') ?? '').trim() || locationId
+  const annee = String(formData.get('annee') ?? '').trim()
+  if (!locationId) return { error: 'Choisis un établissement.' }
+  if (!/^\d{4}$/.test(annee)) return { error: 'Année invalide.' }
+
+  try {
+    // Mémorise l'établissement retenu
+    await supabase
+      .from('ana_params')
+      .upsert({ cle: 'combo_location_id', valeur_texte: locationId }, { onConflict: 'cle' })
+
+    const report = await syncCombo(supabase, locationId, locationName, annee)
+    revalidate()
+    return { report }
+  } catch (e) {
+    return { error: (e as Error).message }
   }
-  return { spec, tried }
 }
 
 // ─── Paramètres ───

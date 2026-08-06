@@ -10,7 +10,7 @@
 //  - provision congés payés : +10 % sur l'ensemble ;
 //  - complément « Poire » : cash, NON soumis aux charges → ajouté après charges.
 
-import type { Contrat, LaborRow, RemunerationPoire } from './types'
+import type { Contrat, HeuresMois, LaborRow, RemunerationPoire } from './types'
 
 export const CP_RATE = 0.1 // provision congés payés
 export const SIXTH_DAY = 1 / 6 // « 6 jours payés 7 »
@@ -122,6 +122,63 @@ export function prevHeures(c: Contrat, ym: string): number {
   if (frac <= 0) return 0
   const hCible = c.heures_hebdo_cible ?? c.heures_hebdo_contrat ?? 0
   return hCible * WEEKS_PER_MONTH * frac
+}
+
+// ─── Calcul depuis les données ComboHR synchronisées (contrats + plannings) ───
+// Source privilégiée dès qu'un mois a des heures synchronisées : elle couvre à
+// la fois le réalisé (pointages) et le prévisionnel (planning).
+
+export function detailFromHeures(
+  c: Contrat,
+  ym: string,
+  heuresSupp: number, // supp_equiv (réel ou planifié)
+): BrutDetail {
+  const frac = activeFraction(c, ym)
+  if (frac <= 0) return blankDetail()
+  const salaire = c.salaire_brut_mensuel || 0
+  const hContrat = c.heures_hebdo_contrat || 0
+  const base = salaire * frac
+  const hMensuelContrat = hContrat * WEEKS_PER_MONTH
+  const hr = hMensuelContrat > 0 ? salaire / hMensuelContrat : 0
+  const supp = hr * heuresSupp
+  const sixieme = base * SIXTH_DAY
+  const sousTotal = base + supp + sixieme
+  const cp = sousTotal * CP_RATE
+  return { base, supp, ferie: 0, sixieme, cp, brut: sousTotal + cp }
+}
+
+export type ComboAgg = {
+  brut: Record<string, BrutDetail>
+  heures: Record<string, number>
+  months: Set<string>
+}
+
+// Agrège par mois à partir des contrats et des heures synchronisées.
+// `mode` : 'reel' (pointages) ou 'planifie' (planning prévu).
+export function aggregateFromCombo(
+  contrats: Contrat[],
+  heures: HeuresMois[],
+  mode: 'reel' | 'planifie',
+): ComboAgg {
+  const byContrat = new Map<string, Contrat>()
+  for (const c of contrats) byContrat.set(c.id, c)
+
+  const brut: Record<string, BrutDetail> = {}
+  const hrs: Record<string, number> = {}
+  const months = new Set<string>()
+
+  for (const h of heures) {
+    const c = byContrat.get(h.contrat_id)
+    if (!c) continue
+    const ym = ymOf(h.mois)
+    const nb = mode === 'reel' ? h.heures_reelles : h.heures_planifiees
+    const supp = mode === 'reel' ? h.supp_equiv_reel : h.supp_equiv_planifie
+    if (!nb && !supp) continue
+    months.add(ym)
+    brut[ym] = addDetail(brut[ym] || blankDetail(), detailFromHeures(c, ym, supp || 0))
+    hrs[ym] = (hrs[ym] || 0) + (nb || 0)
+  }
+  return { brut, heures: hrs, months }
 }
 
 // ─── Agrégats par mois ───
