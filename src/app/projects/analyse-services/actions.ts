@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
-import { comboConfigured, getLocations } from './lib/combo'
+import { comboConfigured, diagnoseAuth, getLocations, type ComboAuthDiag } from './lib/combo'
 import { syncCombo, type SyncReport } from './lib/combo-sync'
 
 const PATHS = [
@@ -171,7 +171,7 @@ export async function importPoireFromScoubidoo(): Promise<ActionState> {
 // ─── ComboHR : établissements & synchronisation ───
 
 const NOT_CONFIGURED =
-  "COMBO_API_KEY n'est pas définie côté serveur. Ajoute-la dans Vercel → Settings → Environment Variables (sans préfixe NEXT_PUBLIC_), puis redéploie."
+  "Aucune information d'authentification ComboHR côté serveur. Renseigne dans Vercel → Settings → Environment Variables soit COMBO_API_KEY (jeton d'accès), soit COMBO_CLIENT_ID + COMBO_CLIENT_SECRET (OAuth doorkeeper) — sans préfixe NEXT_PUBLIC_ — puis redéploie."
 
 export type ComboLocationsState = {
   error?: string
@@ -201,6 +201,15 @@ export async function loadComboLocations(): Promise<ComboLocationsState> {
   } catch (e) {
     return { error: (e as Error).message }
   }
+}
+
+export async function diagnoseComboAuth(): Promise<ComboAuthDiag | { error: string }> {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) return { error: 'Non authentifié.' }
+  return diagnoseAuth()
 }
 
 export type ComboSyncState = { error?: string; report?: SyncReport }
