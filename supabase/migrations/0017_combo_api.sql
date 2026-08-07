@@ -17,8 +17,11 @@ alter table ana_params add column if not exists valeur_texte text;
 -- 2. Contrats : rattachement au contrat Combo (idempotence de la synchro)
 alter table ana_contrats add column if not exists combo_contract_id text;
 alter table ana_contrats add column if not exists synced_at timestamptz;
+-- Index unique SIMPLE (pas partiel) : `ON CONFLICT (combo_contract_id)` ne sait
+-- pas s'appuyer sur un index partiel. Les NULL ne s'entrechoquent pas en
+-- PostgreSQL, les contrats saisis à la main restent donc possibles.
 create unique index if not exists uq_ana_contrats_combo
-  on ana_contrats (combo_contract_id) where combo_contract_id is not null;
+  on ana_contrats (combo_contract_id);
 
 -- 3. Heures par contrat et par mois, issues des plannings Combo
 create table if not exists ana_heures_mois (
