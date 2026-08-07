@@ -7,6 +7,7 @@ import {
   aggregateFromCombo,
   computePrimes,
   coutGlobal,
+  detailFromHeures,
   estimateUnplannedWeeks,
   quotiteContrat,
   labelOfYm,
@@ -15,7 +16,7 @@ import {
   realiseByMonth,
   ymOf,
 } from '../lib/labor'
-import { EUR, N1, PCT } from '../lib/format'
+import { EUR, EUR2, N1, PCT } from '../lib/format'
 import {
   deleteContrat,
   saveContrat,
@@ -219,12 +220,17 @@ function Detail({
   // Heures issues des plannings Combo, par contrat × mois
   const hReel = new Map<string, number>()
   const hProj = new Map<string, number>()
+  const suppProj = new Map<string, number>()
   for (const h of heures) {
     const k = `${h.contrat_id}|${ymOf(h.mois)}`
     hReel.set(k, (hReel.get(k) || 0) + (h.heures_reelles || 0))
     hProj.set(
       k,
       (hProj.get(k) || 0) + (h.heures_projetees ?? h.heures_reelles ?? 0),
+    )
+    suppProj.set(
+      k,
+      (suppProj.get(k) || 0) + (h.supp_equiv_projete ?? h.supp_equiv_reel ?? 0),
     )
   }
 
@@ -241,6 +247,32 @@ function Detail({
 
   // Primes : montant temps plein saisi au mois, proratisé par salarié
   const prim = computePrimes(contratsAnnee, primes, months, heuresTempsPlein)
+
+  // Coût complet d'un salarié sur un mois, avec le détail du calcul
+  const coutCell = (c: Contrat, m: string) => {
+    const k = `${c.id}|${m}`
+    const supp = (suppProj.get(k) ?? 0) + (estim.parContrat[k]?.supp ?? 0)
+    const d = detailFromHeures(c, m, supp)
+    const charges = d.brut * tauxCharges
+    const prime = prim.parContrat[k] ?? 0
+    const poire = poireMap.get(k) ?? 0
+    return { d, charges, prime, poire, total: d.brut + charges + prime + poire }
+  }
+
+  const ligne = (label: string, v: number) => `${label} : ${EUR2(v)}`
+  const explication = (x: ReturnType<typeof coutCell>) =>
+    [
+      ligne('Salaire de base', x.d.base),
+      ligne('Majoration heures supp (×1,10 / ×1,20 / ×1,50)', x.d.supp),
+      ligne('Fériés et 1er mai (+100 %)', x.d.ferie),
+      ligne('6ème jour (base ÷ 6)', x.d.sixieme),
+      ligne('Provision congés payés (+10 %)', x.d.cp),
+      `= Brut : ${EUR2(x.d.brut)}`,
+      ligne(`Charges sociales (${Math.round(tauxCharges * 100)} %)`, x.charges),
+      ligne('Prime (cash, hors charges)', x.prime),
+      ligne('Complément Poire (cash, hors charges)', x.poire),
+      `= Coût global : ${EUR2(x.total)}`,
+    ].join('\n')
 
   return (
     <>
@@ -630,7 +662,72 @@ Complément <b>distinct de la prime</b> ci-dessus : il s&apos;y <b>ajoute</b> (v
         </div>
       </section>
 
-      {/* 5. Détail du calcul du coût global */}
+      {/* 5. Coût par salarié et par mois */}
+      <section>
+        <div className="h2">
+          Coût par salarié <span className="tag">survole un montant pour le détail</span>
+        </div>
+        <div className="daily">
+          <table className="day">
+            <thead>
+              <tr>
+                <th>Salarié</th>
+                {months.map((m) => (
+                  <th key={m}>{m.slice(5)}</th>
+                ))}
+                <th>Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              {contratsAnnee.map((c) => {
+                let tot = 0
+                return (
+                  <tr key={c.id}>
+                    <td>{c.nom_affichage}</td>
+                    {months.map((m) => {
+                      const x = coutCell(c, m)
+                      tot += x.total
+                      if (!x.total) return <td key={m}>—</td>
+                      return (
+                        <td key={m} title={explication(x)} style={{ cursor: 'help' }}>
+                          {EUR(x.total)}
+                        </td>
+                      )
+                    })}
+                    <td>
+                      <b>{EUR(tot)}</b>
+                    </td>
+                  </tr>
+                )
+              })}
+              <tr className="tot">
+                <td>Total</td>
+                {months.map((m) => {
+                  const t = contratsAnnee.reduce((s, c) => s + coutCell(c, m).total, 0)
+                  return <td key={m}>{t ? EUR(t) : '—'}</td>
+                })}
+                <td>
+                  {EUR(
+                    contratsAnnee.reduce(
+                      (s, c) => s + months.reduce((s2, m) => s2 + coutCell(c, m).total, 0),
+                      0,
+                    ),
+                  )}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div className="foot">
+          Coût complet de chaque salarié, mois par mois : heures converties en euros au salaire du contrat,{' '}
+          <b>charges sociales</b> ({Math.round(tauxCharges * 100)} %), puis <b>prime</b> et{' '}
+          <b>complément Poire</b> ajoutés après charges (versés en cash). <b>Survole un montant</b> pour voir le
+          détail ligne à ligne du calcul. Les heures retenues sont celles du tableau ci-dessus (pointées,
+          planifiées ou estimées selon le mois).
+        </div>
+      </section>
+
+      {/* 6. Détail du calcul du coût global */}
       <section>
         <div className="h2">
           Détail du calcul du coût global <span className="tag">réalisé {annee}</span>
