@@ -1,7 +1,8 @@
 import Link from 'next/link'
-import type { Contrat, HeuresMois, LaborRow, RemunerationPoire } from '../lib/types'
+import type { Contrat, HeuresMois, LaborRow, PrimeMois, RemunerationPoire } from '../lib/types'
 import {
   aggregateFromCombo,
+  computePrimes,
   coutGlobal,
   estimateUnplannedWeeks,
   forecastByMonth,
@@ -20,6 +21,8 @@ type Props = {
   contrats: Contrat[]
   heures: HeuresMois[]
   semainesPlan: Set<string>
+  primes: PrimeMois[]
+  heuresTempsPlein: number
   remPoire: RemunerationPoire[]
   tauxCharges: number
   annee: string
@@ -32,6 +35,8 @@ export default function CoutsSalariaux({
   contrats,
   heures,
   semainesPlan,
+  primes,
+  heuresTempsPlein,
   remPoire,
   tauxCharges,
   annee,
@@ -68,7 +73,11 @@ export default function CoutsSalariaux({
     prevH[ym] = comboPrev.heures[ym] ?? 0
   }
 
-  const poire = poireByMonth(remPoire)
+  // Total versé en cash (hors charges) = complément Poire + prime
+  const prim = computePrimes(contrats, primes, months, heuresTempsPlein)
+  const poireSeule = poireByMonth(remPoire)
+  const poire: Record<string, number> = { ...poireSeule }
+  for (const [ym, v] of Object.entries(prim.parMois)) poire[ym] = (poire[ym] || 0) + v
 
   // Totaux annuels
   let tRealBrut = 0
@@ -154,7 +163,7 @@ export default function CoutsSalariaux({
             <div className="v">{EUR(tRealCout)}</div>
             <div className="sub">
               brut {EUR(tRealBrut)} · {N1(tRealH)} h
-              {tPoire ? ` · dont ${EUR(tPoire)} de complément Poire` : ''}
+              {tPoire ? ` · dont ${EUR(tPoire)} en cash (prime + Poire)` : ''}
             </div>
           </div>
           <div className="kpi">
@@ -231,7 +240,7 @@ export default function CoutsSalariaux({
           {estim.horizon
             ? ` — planning saisi jusqu'à la semaine du ${estim.horizon}, ${estim.semaines} semaine(s) estimée(s) au-delà`
             : ''}. Coût global = brut × (1 + {PCT(tauxCharges * 100)} de charges patronales) + complément
-          « Poire » (cash, <b>non soumis aux charges</b>). Le brut inclut la majoration des heures supp, les
+          <b>prime</b> et complément « Poire » (cash, <b>non soumis aux charges</b>). Le brut inclut la majoration des heures supp, les
           fériés, le 6ème jour payé et la provision congés payés. Estimation de gestion, pas un calcul de paie.
           {contrats.length === 0 ? (
             <>

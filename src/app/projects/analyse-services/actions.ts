@@ -245,6 +245,30 @@ export async function syncComboAction(
   }
 }
 
+// ─── Prime mensuelle (référence temps plein) ───
+
+export async function savePrime(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  const supabase = await createClient()
+  const mois = strOrNull(formData.get('mois')) // 'YYYY-MM'
+  const montant = numOrNull(formData.get('montant')) ?? 0
+  if (!mois) return { error: 'Mois obligatoire.' }
+  const moisDate = `${mois.slice(0, 7)}-01`
+
+  if (montant === 0) {
+    const { error } = await supabase.from('ana_primes').delete().eq('mois', moisDate)
+    if (error) return { error: error.message }
+    revalidate()
+    return { success: 'Prime retirée.' }
+  }
+
+  const { error } = await supabase
+    .from('ana_primes')
+    .upsert({ mois: moisDate, montant_temps_plein: montant }, { onConflict: 'mois' })
+  if (error) return { error: error.message }
+  revalidate()
+  return { success: 'Prime enregistrée.' }
+}
+
 // ─── Paramètres ───
 
 export async function saveParam(_prev: ActionState, formData: FormData): Promise<ActionState> {

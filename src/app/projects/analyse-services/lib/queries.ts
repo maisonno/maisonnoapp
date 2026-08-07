@@ -5,6 +5,7 @@ import type {
   LaborEmploye,
   LaborRow,
   PoireDay,
+  PrimeMois,
   RemunerationPoire,
   TicketMetric,
 } from './types'
@@ -122,6 +123,19 @@ export async function getSemainesPlanifiees(): Promise<Set<string>> {
     out.add(`${r.contrat_id}|${r.semaine.slice(0, 10)}`)
   }
   return out
+}
+
+export async function getPrimes(): Promise<PrimeMois[]> {
+  const supabase = await createClient()
+  const { data, error } = await supabase
+    .from('ana_primes')
+    .select('mois,montant_temps_plein')
+    .order('mois', { ascending: true })
+  if (error) {
+    console.error('[ana] getPrimes error:', error.code, error.message)
+    return []
+  }
+  return (data as unknown as PrimeMois[]) ?? []
 }
 
 export async function getRemunerationPoire(): Promise<RemunerationPoire[]> {
