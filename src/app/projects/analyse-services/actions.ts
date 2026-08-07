@@ -250,8 +250,10 @@ export async function syncComboAction(
 export async function saveParam(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const supabase = await createClient()
   const cle = strOrNull(formData.get('cle'))
-  const valeur = numOrNull(formData.get('valeur'))
+  let valeur = numOrNull(formData.get('valeur'))
   if (!cle || valeur == null) return { error: 'Paramètre invalide.' }
+  // Le taux de charges se saisit en pourcentage (30) mais se stocke en décimal
+  if (cle === 'taux_charges_patronales' && valeur > 1) valeur = valeur / 100
   const { error } = await supabase
     .from('ana_params')
     .upsert({ cle, valeur }, { onConflict: 'cle' })

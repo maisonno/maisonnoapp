@@ -3,7 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import {
   getAllLabor,
   getContrats,
-  getLaborEmployes,
+  getHeuresMois,
   getParam,
   getRemunerationPoire,
 } from '../lib/queries'
@@ -24,11 +24,11 @@ export default async function DetailPage({
   if (!user) redirect('/login')
 
   const { annee } = await searchParams
-  const [labor, contrats, remPoire, employes, tauxCharges] = await Promise.all([
+  const [labor, contrats, remPoire, heures, tauxCharges] = await Promise.all([
     getAllLabor(),
     getContrats(),
     getRemunerationPoire(),
-    getLaborEmployes(),
+    getHeuresMois(),
     getParam('taux_charges_patronales', 0.3),
   ])
 
@@ -47,7 +47,7 @@ export default async function DetailPage({
         labor={labor}
         contrats={contrats}
         remPoire={remPoire}
-        employes={employes}
+        heures={heures}
         tauxCharges={tauxCharges}
         annee={anneeActive}
         anneesDispo={anneesDispo}
