@@ -97,7 +97,10 @@ export async function getHeuresMois(): Promise<HeuresMois[]> {
   const supabase = await createClient()
   const { data, error } = await supabase
     .from('ana_heures_mois')
-    .select('contrat_id,mois,heures_reelles,heures_planifiees,supp_equiv_reel,supp_equiv_planifie')
+    .select(
+      'contrat_id,mois,heures_reelles,heures_planifiees,heures_projetees,' +
+        'supp_equiv_reel,supp_equiv_planifie,supp_equiv_projete',
+    )
     .order('mois', { ascending: true })
   if (error) {
     console.error('[ana] getHeuresMois error:', error.code, error.message)

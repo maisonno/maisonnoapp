@@ -75,10 +75,12 @@ export type Contrat = {
 export type HeuresMois = {
   contrat_id: string
   mois: string // 'YYYY-MM-DD' (1er du mois)
-  heures_reelles: number
-  heures_planifiees: number
+  heures_reelles: number // pointages uniquement
+  heures_planifiees: number // planning uniquement
+  heures_projetees: number // pointage si connu, sinon planning (total attendu)
   supp_equiv_reel: number
   supp_equiv_planifie: number
+  supp_equiv_projete: number
 }
 
 export type RemunerationPoire = {
