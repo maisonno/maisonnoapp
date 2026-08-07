@@ -38,20 +38,19 @@ export default function ComboSync() {
 
       {loading && <div className="foot">Connexion à ComboHR…</div>}
 
-      {locs.error && (
-        <>
-          <div className="msg-err">{locs.error}</div>
-          <div style={{ marginBottom: 12 }}>
-            <button
-              className="btn btn-ghost"
-              type="button"
-              disabled={diagPending}
-              onClick={() => startDiag(async () => setDiag(await diagnoseComboAuth()))}
-            >
-              {diagPending ? 'Diagnostic…' : 'Diagnostiquer l’authentification'}
-            </button>
-          </div>
-        </>
+      {locs.error && <div className="msg-err">{locs.error}</div>}
+
+      {!loading && (
+        <div style={{ marginBottom: 12 }}>
+          <button
+            className="btn btn-ghost"
+            type="button"
+            disabled={diagPending}
+            onClick={() => startDiag(async () => setDiag(await diagnoseComboAuth()))}
+          >
+            {diagPending ? 'Diagnostic…' : 'Diagnostiquer l’authentification'}
+          </button>
+        </div>
       )}
 
       {diag && (
@@ -73,21 +72,48 @@ export default function ComboSync() {
                   <tr>
                     <td>COMBO_API_KEY</td>
                     <td>
-                      {diag.hasApiKey ? `✓ définie (${diag.apiKeyLength} caractères)` : '✗ absente'}
+                      {diag.hasApiKey
+                        ? `✓ définie — ${diag.apiKeyLength} caractères utiles${
+                            diag.rawLength !== diag.apiKeyLength
+                              ? ` (${diag.rawLength} bruts, nettoyée)`
+                              : ''
+                          }`
+                        : '✗ absente'}
                     </td>
                   </tr>
+                  {diag.hygiene.length > 0 && (
+                    <tr>
+                      <td>⚠️ Valeur suspecte</td>
+                      <td style={{ color: 'var(--resto)' }}>
+                        {diag.hygiene.join(' · ')} — recopie la clé sans rien d&apos;autre.
+                      </td>
+                    </tr>
+                  )}
                   <tr>
-                    <td>COMBO_CLIENT_ID</td>
-                    <td>{diag.hasClientId ? '✓ défini' : '✗ absent'}</td>
-                  </tr>
-                  <tr>
-                    <td>COMBO_CLIENT_SECRET</td>
-                    <td>{diag.hasClientSecret ? '✓ défini' : '✗ absent'}</td>
+                    <td>COMBO_CLIENT_ID / SECRET</td>
+                    <td>
+                      {diag.hasClientId || diag.hasClientSecret
+                        ? '✓ définis (OAuth) — inutiles avec une clé simple'
+                        : '— non utilisés'}
+                    </td>
                   </tr>
                   <tr>
                     <td>Obtention du jeton</td>
                     <td>{diag.tokenOk ? '✓ OK' : `✗ ${diag.tokenError ?? 'échec'}`}</td>
                   </tr>
+                  {diag.probe && (
+                    <tr>
+                      <td>Appel /api/v1/locations</td>
+                      <td>
+                        HTTP {diag.probe.status ?? '—'}
+                        <div style={{ marginTop: 4 }}>
+                          <code style={{ fontSize: 11, wordBreak: 'break-all', whiteSpace: 'pre-wrap' }}>
+                            {diag.probe.body || '(corps vide)'}
+                          </code>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
                 </>
               )}
             </tbody>
