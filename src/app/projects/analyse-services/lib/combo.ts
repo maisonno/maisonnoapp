@@ -8,7 +8,89 @@
 export const COMBO_BASE = process.env.COMBO_API_BASE_URL ?? 'https://partner.combohr.com'
 
 export const comboKey = () => process.env.COMBO_API_KEY ?? ''
-export const comboConfigured = () => comboKey().length > 0
+const clientId = () => process.env.COMBO_CLIENT_ID ?? ''
+const clientSecret = () => process.env.COMBO_CLIENT_SECRET ?? ''
+
+export const comboConfigured = () =>
+  comboKey().length > 0 || (clientId().length > 0 && clientSecret().length > 0)
+
+// ─── Jeton d'accès ───
+// La sécurité déclarée par la spec est `doorkeeper` (serveur OAuth2 de Rails).
+// Deux cas de figure :
+//  · COMBO_API_KEY = jeton d'accès déjà émis → utilisé tel quel ;
+//  · COMBO_CLIENT_ID + COMBO_CLIENT_SECRET → échangés contre un jeton via
+//    /oauth/token (grant client_credentials), puis mis en cache.
+
+let cachedToken: { value: string; expiresAt: number } | null = null
+
+export async function accessToken(): Promise<string> {
+  const id = clientId()
+  const secret = clientSecret()
+
+  if (id && secret) {
+    if (cachedToken && cachedToken.expiresAt > Date.now() + 30_000) return cachedToken.value
+    const url = `${COMBO_BASE.replace(/\/+$/, '')}/oauth/token`
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify({ grant_type: 'client_credentials', client_id: id, client_secret: secret }),
+      signal: AbortSignal.timeout(15000),
+      cache: 'no-store',
+    })
+    const text = await res.text()
+    if (!res.ok) {
+      throw new ComboError(
+        `Échange OAuth (/oauth/token) → HTTP ${res.status}. ${text.slice(0, 200)}`,
+        res.status,
+      )
+    }
+    let parsed: { access_token?: string; expires_in?: number }
+    try {
+      parsed = JSON.parse(text)
+    } catch {
+      throw new ComboError('Réponse /oauth/token non-JSON.')
+    }
+    if (!parsed.access_token) throw new ComboError('Réponse /oauth/token sans access_token.')
+    cachedToken = {
+      value: parsed.access_token,
+      expiresAt: Date.now() + (parsed.expires_in ?? 3600) * 1000,
+    }
+    return cachedToken.value
+  }
+
+  const direct = comboKey()
+  if (!direct) throw new ComboError('Aucune information d’authentification ComboHR côté serveur.')
+  return direct
+}
+
+// Diagnostic : ne révèle jamais les valeurs, seulement leur présence.
+export type ComboAuthDiag = {
+  hasApiKey: boolean
+  apiKeyLength: number
+  hasClientId: boolean
+  hasClientSecret: boolean
+  base: string
+  tokenOk?: boolean
+  tokenError?: string
+}
+
+export async function diagnoseAuth(): Promise<ComboAuthDiag> {
+  const diag: ComboAuthDiag = {
+    hasApiKey: comboKey().length > 0,
+    apiKeyLength: comboKey().length,
+    hasClientId: clientId().length > 0,
+    hasClientSecret: clientSecret().length > 0,
+    base: COMBO_BASE,
+  }
+  try {
+    await accessToken()
+    diag.tokenOk = true
+  } catch (e) {
+    diag.tokenOk = false
+    diag.tokenError = (e as Error).message
+  }
+  return diag
+}
 
 // ─── Types (sous-ensemble utile de la spec) ───
 
@@ -71,8 +153,7 @@ function scrub(text: string, key: string) {
 }
 
 async function comboGet<T>(path: string, params: Record<string, string | undefined> = {}): Promise<T> {
-  const key = comboKey()
-  if (!key) throw new ComboError('COMBO_API_KEY absente côté serveur.')
+  const token = await accessToken()
 
   const url = new URL(`${COMBO_BASE.replace(/\/+$/, '')}/api/v1/${path.replace(/^\/+/, '')}`)
   for (const [k, v] of Object.entries(params)) if (v) url.searchParams.set(k, v)
@@ -80,21 +161,27 @@ async function comboGet<T>(path: string, params: Record<string, string | undefin
   let res: Response
   try {
     res = await fetch(url, {
-      headers: { Accept: 'application/json', Authorization: `Bearer ${key}` },
+      headers: { Accept: 'application/json', Authorization: `Bearer ${token}` },
       signal: AbortSignal.timeout(20000),
       cache: 'no-store',
     })
   } catch (e) {
-    throw new ComboError(`Appel ${path} : ${scrub((e as Error).message, key)}`)
+    throw new ComboError(`Appel ${path} : ${scrub((e as Error).message, token)}`)
   }
 
   const text = await res.text()
   if (!res.ok) {
+    if (res.status === 401) cachedToken = null // force un nouvel échange au prochain appel
     const hint =
-      res.status === 401 || res.status === 403
-        ? ' (clé refusée : vérifie COMBO_API_KEY et les droits du compte partenaire)'
-        : ''
-    throw new ComboError(`${path} → HTTP ${res.status}${hint}. ${scrub(text.slice(0, 200), key)}`, res.status)
+      res.status === 401
+        ? " — jeton refusé. Si Combo t'a fourni un client_id + client_secret (OAuth doorkeeper), renseigne COMBO_CLIENT_ID et COMBO_CLIENT_SECRET plutôt que COMBO_API_KEY."
+        : res.status === 403
+          ? ' — accès refusé : le compte partenaire n’a pas les droits sur cette ressource.'
+          : ''
+    throw new ComboError(
+      `${path} → HTTP ${res.status}${hint} ${scrub(text.slice(0, 200), token)}`,
+      res.status,
+    )
   }
   try {
     return JSON.parse(text) as T

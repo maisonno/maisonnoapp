@@ -1,16 +1,21 @@
 'use client'
 
-import { useActionState, useEffect, useState } from 'react'
+import { useActionState, useEffect, useState, useTransition } from 'react'
 import {
+  diagnoseComboAuth,
   loadComboLocations,
   syncComboAction,
   type ComboLocationsState,
   type ComboSyncState,
 } from '../actions'
 
+type Diag = Awaited<ReturnType<typeof diagnoseComboAuth>>
+
 export default function ComboSync() {
   const [locs, setLocs] = useState<ComboLocationsState>({})
   const [loading, setLoading] = useState(true)
+  const [diag, setDiag] = useState<Diag | null>(null)
+  const [diagPending, startDiag] = useTransition()
   const [state, action, pending] = useActionState(syncComboAction, {} as ComboSyncState)
 
   const now = new Date()
@@ -32,7 +37,63 @@ export default function ComboSync() {
       </div>
 
       {loading && <div className="foot">Connexion à ComboHR…</div>}
-      {locs.error && <div className="msg-err">{locs.error}</div>}
+
+      {locs.error && (
+        <>
+          <div className="msg-err">{locs.error}</div>
+          <div style={{ marginBottom: 12 }}>
+            <button
+              className="btn btn-ghost"
+              type="button"
+              disabled={diagPending}
+              onClick={() => startDiag(async () => setDiag(await diagnoseComboAuth()))}
+            >
+              {diagPending ? 'Diagnostic…' : 'Diagnostiquer l’authentification'}
+            </button>
+          </div>
+        </>
+      )}
+
+      {diag && (
+        <div className="daily" style={{ marginBottom: 14 }}>
+          <table className="day">
+            <tbody>
+              {'error' in diag ? (
+                <tr>
+                  <td colSpan={2}>{diag.error}</td>
+                </tr>
+              ) : (
+                <>
+                  <tr>
+                    <td>Serveur</td>
+                    <td>
+                      <code style={{ fontSize: 12 }}>{diag.base}</code>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td>COMBO_API_KEY</td>
+                    <td>
+                      {diag.hasApiKey ? `✓ définie (${diag.apiKeyLength} caractères)` : '✗ absente'}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td>COMBO_CLIENT_ID</td>
+                    <td>{diag.hasClientId ? '✓ défini' : '✗ absent'}</td>
+                  </tr>
+                  <tr>
+                    <td>COMBO_CLIENT_SECRET</td>
+                    <td>{diag.hasClientSecret ? '✓ défini' : '✗ absent'}</td>
+                  </tr>
+                  <tr>
+                    <td>Obtention du jeton</td>
+                    <td>{diag.tokenOk ? '✓ OK' : `✗ ${diag.tokenError ?? 'échec'}`}</td>
+                  </tr>
+                </>
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
 
       {options.length > 0 && (
         <form action={action} className="frm">
@@ -102,6 +163,11 @@ export default function ComboSync() {
         relancer la synchro met à jour, ne duplique pas. Les champs saisis à la main dans la zone Détail (heures
         hebdo cible, compléments Poire) sont préservés. La majoration des heures supp est calculée semaine par
         semaine au barème CHR (≤39 h ×1,10 · 39-43 h ×1,20 · &gt;43 h ×1,50).
+        <br />
+        <b>Authentification :</b> l&apos;API utilise OAuth (doorkeeper). Si Combo t&apos;a fourni un{' '}
+        <b>client_id + client_secret</b>, renseigne <code>COMBO_CLIENT_ID</code> et{' '}
+        <code>COMBO_CLIENT_SECRET</code> (l&apos;échange contre un jeton est automatique). Si Combo t&apos;a
+        fourni directement un <b>jeton d&apos;accès</b>, utilise <code>COMBO_API_KEY</code>.
       </div>
     </section>
   )
