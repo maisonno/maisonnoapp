@@ -86,7 +86,13 @@ export type ComboAuthDiag = {
   base: string
   tokenOk?: boolean
   tokenError?: string
-  probe?: { status: number | null; body: string }
+  variants?: {
+    id: string
+    label: string
+    status: number | null
+    wwwAuth: string | null
+    body: string
+  }[]
 }
 
 function hygieneOf(raw: string | undefined): string[] {
@@ -116,17 +122,35 @@ export async function diagnoseAuth(): Promise<ComboAuthDiag> {
   try {
     const token = await accessToken()
     diag.tokenOk = true
-    // Sonde /locations pour remonter le message exact de Combo
-    try {
-      const res = await fetch(`${COMBO_BASE}/api/v1/locations`, {
-        headers: { Accept: 'application/json', Authorization: `Bearer ${token}` },
-        signal: AbortSignal.timeout(15000),
-        cache: 'no-store',
-      })
-      const body = await res.text()
-      diag.probe = { status: res.status, body: scrub(body.slice(0, 300), token) }
-    } catch (e) {
-      diag.probe = { status: null, body: scrub((e as Error).message, token) }
+    // Sonde /locations avec chaque variante d'authentification et remonte
+    // WWW-Authenticate, où Doorkeeper précise la cause exacte du refus.
+    diag.variants = []
+    for (const v of AUTH_VARIANTS) {
+      const url = new URL(`${COMBO_BASE.replace(/\/+$/, '')}/api/v1/locations`)
+      const headers = applyVariant(url, v.id, token)
+      try {
+        const res = await fetch(url, {
+          headers,
+          signal: AbortSignal.timeout(15000),
+          cache: 'no-store',
+        })
+        const body = await res.text()
+        diag.variants.push({
+          id: v.id,
+          label: v.label,
+          status: res.status,
+          wwwAuth: res.headers.get('www-authenticate'),
+          body: scrub(body.slice(0, 200), token),
+        })
+      } catch (e) {
+        diag.variants.push({
+          id: v.id,
+          label: v.label,
+          status: null,
+          wwwAuth: null,
+          body: scrub((e as Error).message, token),
+        })
+      }
     }
   } catch (e) {
     diag.tokenOk = false
@@ -195,26 +219,80 @@ function scrub(text: string, key: string) {
   return key ? text.split(key).join('«CLÉ MASQUÉE»') : text
 }
 
+// Façons possibles de présenter la clé. Doorkeeper accepte l'en-tête Bearer
+// mais aussi le paramètre `access_token` ; certaines passerelles attendent un
+// en-tête dédié. On essaie dans l'ordre et on mémorise celle qui fonctionne.
+export const AUTH_VARIANTS = [
+  { id: 'bearer', label: 'Authorization: Bearer <clé>' },
+  { id: 'raw', label: 'Authorization: <clé>' },
+  { id: 'token', label: 'Authorization: Token token=<clé>' },
+  { id: 'x-api-key', label: 'X-Api-Key: <clé>' },
+  { id: 'api-key', label: 'Api-Key: <clé>' },
+  { id: 'query', label: '?access_token=<clé>' },
+] as const
+export type AuthVariant = (typeof AUTH_VARIANTS)[number]['id']
+
+export function applyVariant(url: URL, variant: AuthVariant, token: string): HeadersInit {
+  const h: Record<string, string> = { Accept: 'application/json' }
+  switch (variant) {
+    case 'bearer':
+      h.Authorization = `Bearer ${token}`
+      break
+    case 'raw':
+      h.Authorization = token
+      break
+    case 'token':
+      h.Authorization = `Token token=${token}`
+      break
+    case 'x-api-key':
+      h['X-Api-Key'] = token
+      break
+    case 'api-key':
+      h['Api-Key'] = token
+      break
+    case 'query':
+      url.searchParams.set('access_token', token)
+      break
+  }
+  return h
+}
+
+// Variante retenue (mémorisée après le premier succès) — surchargeable par env.
+let workingVariant: AuthVariant | null = (process.env.COMBO_AUTH_VARIANT as AuthVariant) || null
+
 async function comboGet<T>(path: string, params: Record<string, string | undefined> = {}): Promise<T> {
   const token = await accessToken()
 
-  const url = new URL(`${COMBO_BASE.replace(/\/+$/, '')}/api/v1/${path.replace(/^\/+/, '')}`)
-  for (const [k, v] of Object.entries(params)) if (v) url.searchParams.set(k, v)
+  const build = () => {
+    const u = new URL(`${COMBO_BASE.replace(/\/+$/, '')}/api/v1/${path.replace(/^\/+/, '')}`)
+    for (const [k, v] of Object.entries(params)) if (v) u.searchParams.set(k, v)
+    return u
+  }
 
-  const call = (authorization: string) =>
-    fetch(url, {
-      headers: { Accept: 'application/json', Authorization: authorization },
-      signal: AbortSignal.timeout(20000),
-      cache: 'no-store',
-    })
+  const attempt = async (variant: AuthVariant) => {
+    const u = build()
+    const headers = applyVariant(u, variant, token)
+    return fetch(u, { headers, signal: AbortSignal.timeout(20000), cache: 'no-store' })
+  }
 
   let res: Response
   try {
-    res = await call(`Bearer ${token}`)
-    // Certaines installations attendent la clé brute plutôt que le préfixe Bearer
-    if (res.status === 401) {
-      const retry = await call(token)
-      if (retry.ok) res = retry
+    const order: AuthVariant[] = workingVariant
+      ? [workingVariant, ...AUTH_VARIANTS.map((v) => v.id).filter((v) => v !== workingVariant)]
+      : AUTH_VARIANTS.map((v) => v.id)
+
+    res = await attempt(order[0])
+    if (res.status === 401 || res.status === 403) {
+      for (const v of order.slice(1)) {
+        const retry = await attempt(v)
+        if (retry.ok) {
+          workingVariant = v
+          res = retry
+          break
+        }
+      }
+    } else if (res.ok) {
+      workingVariant = order[0]
     }
   } catch (e) {
     throw new ComboError(`Appel ${path} : ${scrub((e as Error).message, token)}`)

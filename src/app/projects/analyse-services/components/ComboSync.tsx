@@ -101,19 +101,30 @@ export default function ComboSync() {
                     <td>Obtention du jeton</td>
                     <td>{diag.tokenOk ? '✓ OK' : `✗ ${diag.tokenError ?? 'échec'}`}</td>
                   </tr>
-                  {diag.probe && (
-                    <tr>
-                      <td>Appel /api/v1/locations</td>
+                  {diag.variants?.map((v) => (
+                    <tr key={v.id} style={{ background: v.status === 200 ? 'rgba(122,154,60,.14)' : undefined }}>
                       <td>
-                        HTTP {diag.probe.status ?? '—'}
-                        <div style={{ marginTop: 4 }}>
-                          <code style={{ fontSize: 11, wordBreak: 'break-all', whiteSpace: 'pre-wrap' }}>
-                            {diag.probe.body || '(corps vide)'}
-                          </code>
-                        </div>
+                        <code style={{ fontSize: 11 }}>{v.label}</code>
+                      </td>
+                      <td>
+                        <b>HTTP {v.status ?? '—'}</b>
+                        {v.wwwAuth && (
+                          <div style={{ marginTop: 4, color: 'var(--resto)' }}>
+                            <code style={{ fontSize: 11, whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
+                              WWW-Authenticate: {v.wwwAuth}
+                            </code>
+                          </div>
+                        )}
+                        {v.body && (
+                          <div style={{ marginTop: 4 }}>
+                            <code style={{ fontSize: 11, whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
+                              {v.body}
+                            </code>
+                          </div>
+                        )}
                       </td>
                     </tr>
-                  )}
+                  ))}
                 </>
               )}
             </tbody>
