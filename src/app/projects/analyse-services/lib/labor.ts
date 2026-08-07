@@ -192,6 +192,168 @@ export function aggregateFromCombo(
   return { brut, heures: hrs, months }
 }
 
+// ─── Estimation des semaines au-delà de l'horizon de planification ───
+// Le planning se fait semaine par semaine. La limite n'est pas la date du jour
+// mais le **dernier shift planifié**, tous salariés confondus : c'est
+// l'horizon de planification.
+//   · semaine ≤ horizon → le planning est fait ; une semaine sans shift signifie
+//     que le salarié ne travaille pas, on n'estime rien ;
+//   · semaine > horizon → le planning reste à faire, on estime les heures à
+//     partir de l'horaire hebdo cible (à défaut l'horaire contractuel), au
+//     prorata des jours réellement couverts par le contrat.
+
+const DAY_MS = 86400000
+
+const toUtc = (iso: string) => {
+  const [y, m, d] = iso.split('-').map(Number)
+  return Date.UTC(y, m - 1, d)
+}
+const toIso = (ms: number) => new Date(ms).toISOString().slice(0, 10)
+
+// Lundi de la semaine contenant `iso`
+export function mondayOf(iso: string): string {
+  const ms = toUtc(iso)
+  const dow = (new Date(ms).getUTCDay() + 6) % 7 // 0 = lundi
+  return toIso(ms - dow * DAY_MS)
+}
+
+export type EstimAgg = {
+  heures: Record<string, number> // par mois 'YYYY-MM'
+  supp: Record<string, number> // équivalent majoration heures supp
+  semaines: number // nb de semaines estimées (info)
+  horizon: string | null // dernier lundi planifié de l'année
+  parContrat: Record<string, { heures: number; supp: number }> // clé `${contratId}|${ym}`
+}
+
+// Dernier lundi planifié de l'année, tous salariés confondus.
+export function horizonPlanning(plannedWeeks: Set<string>, annee: string): string | null {
+  let max: string | null = null
+  for (const k of plannedWeeks) {
+    const semaine = k.split('|')[1]
+    if (!semaine?.startsWith(annee)) continue
+    if (!max || semaine > max) max = semaine
+  }
+  return max
+}
+
+export function estimateUnplannedWeeks(
+  contrats: Contrat[],
+  plannedWeeks: Set<string>, // `${contrat_id}|${lundi}`
+  annee: string,
+): EstimAgg {
+  const horizon = horizonPlanning(plannedWeeks, annee)
+  const heures: Record<string, number> = {}
+  const supp: Record<string, number> = {}
+  const parContrat: Record<string, { heures: number; supp: number }> = {}
+  let semaines = 0
+  const bump = (cid: string, ym: string, h: number, s: number) => {
+    const k = `${cid}|${ym}`
+    const cur = parContrat[k] || { heures: 0, supp: 0 }
+    cur.heures += h
+    cur.supp += s
+    parContrat[k] = cur
+  }
+
+  const debutAnnee = toUtc(`${annee}-01-01`)
+  const finAnnee = toUtc(`${annee}-12-31`)
+  // Aucun planning sur l'année → tout est au-delà de l'horizon
+  const horizonMs = horizon ? toUtc(horizon) : -Infinity
+
+  for (const c of contrats) {
+    if (!c.actif) continue
+    const hebdo = c.heures_hebdo_cible ?? c.heures_hebdo_contrat ?? 0
+    if (hebdo <= 0) continue
+    const contratH = c.heures_hebdo_contrat ?? hebdo
+
+    const debutContrat = c.date_debut ? toUtc(c.date_debut) : debutAnnee
+    const finContrat = c.date_fin ? toUtc(c.date_fin) : finAnnee
+    if (finContrat < debutAnnee || debutContrat > finAnnee) continue
+
+    // Parcours des semaines de l'année (lundis)
+    let lundi = toUtc(mondayOf(`${annee}-01-01`))
+    for (; lundi <= finAnnee; lundi += 7 * DAY_MS) {
+      const semaineIso = toIso(lundi)
+      // En deçà de l'horizon, le planning est fait : pas de shift = pas de travail
+      if (lundi <= horizonMs) continue
+      if (plannedWeeks.has(`${c.id}|${semaineIso}`)) continue
+
+      // Jours de la semaine couverts par le contrat ET dans l'année
+      let jours = 0
+      const parMois: Record<string, number> = {}
+      for (let i = 0; i < 7; i++) {
+        const j = lundi + i * DAY_MS
+        if (j < debutContrat || j > finContrat) continue
+        if (j < debutAnnee || j > finAnnee) continue
+        jours++
+        const ym = toIso(j).slice(0, 7)
+        parMois[ym] = (parMois[ym] || 0) + 1
+      }
+      if (jours === 0) continue
+
+      semaines++
+      const hSemaine = (hebdo * jours) / 7
+      // Heures ventilées au mois réel de chaque jour (semaine à cheval)
+      for (const [ym, n] of Object.entries(parMois)) {
+        const h = (hebdo * n) / 7
+        heures[ym] = (heures[ym] || 0) + h
+        bump(c.id, ym, h, 0)
+      }
+      // Majoration rattachée au mois du lundi, comme à la synchro
+      const ymLundi = semaineIso.slice(0, 7)
+      const maj = majoredHours(contratH, hSemaine)
+      supp[ymLundi] = (supp[ymLundi] || 0) + maj
+      bump(c.id, ymLundi, 0, maj)
+    }
+  }
+
+  return { heures, supp, semaines, horizon, parContrat }
+}
+
+// ─── Prévisionnel complet, par mois ───
+// Pour chaque contrat actif dans le mois : salaire de base au prorata de la
+// période (il est dû que la semaine soit planifiée ou non) + majoration des
+// heures supp issues du planning ET des semaines estimées.
+export function forecastByMonth(
+  contrats: Contrat[],
+  heures: HeuresMois[],
+  estim: EstimAgg,
+  months: string[],
+): { brut: Record<string, BrutDetail>; heures: Record<string, number> } {
+  const suppPlan = new Map<string, number>()
+  const hPlan = new Map<string, number>()
+  for (const h of heures) {
+    const k = `${h.contrat_id}|${ymOf(h.mois)}`
+    suppPlan.set(k, (suppPlan.get(k) || 0) + (h.supp_equiv_projete ?? h.supp_equiv_reel ?? 0))
+    hPlan.set(k, (hPlan.get(k) || 0) + (h.heures_projetees ?? h.heures_reelles ?? 0))
+  }
+
+  const brut: Record<string, BrutDetail> = {}
+  const hrs: Record<string, number> = {}
+
+  for (const ym of months) {
+    let acc = blankDetail()
+    let totH = 0
+    let actif = false
+    for (const c of contrats) {
+      if (!c.actif) continue
+      if (activeFraction(c, ym) <= 0) continue
+      const k = `${c.id}|${ym}`
+      const e = estim.parContrat[k]
+      const supp = (suppPlan.get(k) || 0) + (e?.supp || 0)
+      const h = (hPlan.get(k) || 0) + (e?.heures || 0)
+      if (!h && !supp) continue // contrat actif mais aucune activité attendue
+      actif = true
+      acc = addDetail(acc, detailFromHeures(c, ym, supp))
+      totH += h
+    }
+    if (actif) {
+      brut[ym] = acc
+      hrs[ym] = totH
+    }
+  }
+  return { brut, heures: hrs }
+}
+
 // ─── Agrégats par mois ───
 
 export const ymOf = (iso: string) => iso.slice(0, 7)

@@ -23,6 +23,7 @@ export type SyncReport = {
   contratsSansFin: number
   shifts: number
   moisAvecHeures: number
+  semainesPlanifiees: number
   heuresReelles: number
   heuresPlanifiees: number
 }
@@ -223,6 +224,38 @@ export async function syncCombo(
     if (error) throw new Error(`Écriture des heures : ${error.message}`)
   }
 
+  // ─── 6. Semaines effectivement planifiées (base de l'estimation des autres)
+  const semaineRows: { contrat_id: string; semaine: string }[] = []
+  const vues = new Set<string>()
+  for (const wk of perWeek.keys()) {
+    const [lineage, semaine] = wk.split('|')
+    const contratId = idByLineage.get(lineage)
+    if (!contratId || !semaine.startsWith(annee)) continue
+    const k = `${contratId}|${semaine}`
+    if (vues.has(k)) continue
+    vues.add(k)
+    semaineRows.push({ contrat_id: contratId, semaine })
+  }
+
+  // On repart d'une base propre pour l'année : une semaine dé-planifiée dans
+  // Combo doit redevenir estimable ici.
+  const contratIds = [...idByLineage.values()]
+  if (contratIds.length > 0) {
+    const { error } = await supabase
+      .from('ana_semaines_planifiees')
+      .delete()
+      .in('contrat_id', contratIds)
+      .gte('semaine', `${annee}-01-01`)
+      .lte('semaine', `${annee}-12-31`)
+    if (error) throw new Error(`Nettoyage des semaines : ${error.message}`)
+  }
+  for (let i = 0; i < semaineRows.length; i += 500) {
+    const { error } = await supabase
+      .from('ana_semaines_planifiees')
+      .upsert(semaineRows.slice(i, i + 500), { onConflict: 'contrat_id,semaine' })
+    if (error) throw new Error(`Écriture des semaines : ${error.message}`)
+  }
+
   return {
     locationName,
     annee,
@@ -231,6 +264,7 @@ export async function syncCombo(
     contratsSansFin: rows.filter((r) => r.date_fin == null).length,
     shifts: shifts.length,
     moisAvecHeures: heuresRows.length,
+    semainesPlanifiees: semaineRows.length,
     heuresReelles: Math.round(totalReel),
     heuresPlanifiees: Math.round(totalPrev),
   }

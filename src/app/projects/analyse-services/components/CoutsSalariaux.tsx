@@ -3,6 +3,8 @@ import type { Contrat, HeuresMois, LaborRow, RemunerationPoire } from '../lib/ty
 import {
   aggregateFromCombo,
   coutGlobal,
+  estimateUnplannedWeeks,
+  forecastByMonth,
   heuresRealiseesByMonth,
   labelOfYm,
   monthsOfYear,
@@ -17,6 +19,7 @@ type Props = {
   labor: LaborRow[]
   contrats: Contrat[]
   heures: HeuresMois[]
+  semainesPlan: Set<string>
   remPoire: RemunerationPoire[]
   tauxCharges: number
   annee: string
@@ -28,6 +31,7 @@ export default function CoutsSalariaux({
   labor,
   contrats,
   heures,
+  semainesPlan,
   remPoire,
   tauxCharges,
   annee,
@@ -40,8 +44,10 @@ export default function CoutsSalariaux({
   // fichier (ana_labor) pour les mois non couverts par la synchro.
   const combo = aggregateFromCombo(contrats, heures, 'reel')
   // Prévisionnel = total attendu : pointages pour les shifts passés, planning
-  // pour ceux à venir (un mois en cours n'est donc pas sous-estimé).
-  const comboPrev = aggregateFromCombo(contrats, heures, 'projete')
+  // pour ceux à venir, et estimation pour les semaines futures pas encore
+  // planifiées (horaire hebdo cible au prorata de la période de contrat).
+  const estim = estimateUnplannedWeeks(contrats, semainesPlan, annee)
+  const comboPrev = forecastByMonth(contrats, heures, estim, months)
   const fileReal = realiseByMonth(labor)
   const fileRealH = heuresRealiseesByMonth(labor)
 
@@ -57,7 +63,7 @@ export default function CoutsSalariaux({
   const prevHCible = prevHeuresByMonth(contrats, months)
   const prev: typeof prevCible = { ...prevCible }
   const prevH: Record<string, number> = { ...prevHCible }
-  for (const ym of comboPrev.months) {
+  for (const ym of Object.keys(comboPrev.brut)) {
     prev[ym] = comboPrev.brut[ym]
     prevH[ym] = comboPrev.heures[ym] ?? 0
   }
@@ -219,9 +225,12 @@ export default function CoutsSalariaux({
         </div>
         <div className="foot">
           <b>Réalisé</b> : heures réellement pointées dans ComboHR, valorisées au salaire du contrat.{' '}
-          <b>Prévisionnel</b> : total attendu — heures pointées pour les shifts passés et heures planifiées pour
-          ceux à venir ; à défaut de planning, les heures hebdo cible saisies dans la zone Détail, au prorata de
-          la période de contrat. Coût global = brut × (1 + {PCT(tauxCharges * 100)} de charges patronales) + complément
+          <b>Prévisionnel</b> : total attendu — heures pointées pour les shifts passés, heures planifiées pour
+          ceux à venir, et <b>au-delà du dernier shift planifié</b> une estimation à partir de l&apos;horaire
+          hebdo cible (à défaut l&apos;horaire contractuel), au prorata des jours couverts par le contrat
+          {estim.horizon
+            ? ` — planning saisi jusqu'à la semaine du ${estim.horizon}, ${estim.semaines} semaine(s) estimée(s) au-delà`
+            : ''}. Coût global = brut × (1 + {PCT(tauxCharges * 100)} de charges patronales) + complément
           « Poire » (cash, <b>non soumis aux charges</b>). Le brut inclut la majoration des heures supp, les
           fériés, le 6ème jour payé et la provision congés payés. Estimation de gestion, pas un calcul de paie.
           {contrats.length === 0 ? (

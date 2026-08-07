@@ -6,6 +6,7 @@ import {
   getHeuresMois,
   getParam,
   getRemunerationPoire,
+  getSemainesPlanifiees,
 } from '../lib/queries'
 import PageHeader from '../components/PageHeader'
 import DetailSalaires from '../components/DetailSalaires'
@@ -24,11 +25,12 @@ export default async function DetailPage({
   if (!user) redirect('/login')
 
   const { annee } = await searchParams
-  const [labor, contrats, remPoire, heures, tauxCharges] = await Promise.all([
+  const [labor, contrats, remPoire, heures, semainesPlan, tauxCharges] = await Promise.all([
     getAllLabor(),
     getContrats(),
     getRemunerationPoire(),
     getHeuresMois(),
+    getSemainesPlanifiees(),
     getParam('taux_charges_patronales', 0.3),
   ])
 
@@ -48,6 +50,7 @@ export default async function DetailPage({
         contrats={contrats}
         remPoire={remPoire}
         heures={heures}
+        semainesPlan={semainesPlan}
         tauxCharges={tauxCharges}
         annee={anneeActive}
         anneesDispo={anneesDispo}

@@ -109,6 +109,21 @@ export async function getHeuresMois(): Promise<HeuresMois[]> {
   return (data as unknown as HeuresMois[]) ?? []
 }
 
+// Semaines ayant un planning ComboHR, sous forme `${contrat_id}|${lundi}`
+export async function getSemainesPlanifiees(): Promise<Set<string>> {
+  const supabase = await createClient()
+  const { data, error } = await supabase.from('ana_semaines_planifiees').select('contrat_id,semaine')
+  if (error) {
+    console.error('[ana] getSemainesPlanifiees error:', error.code, error.message)
+    return new Set()
+  }
+  const out = new Set<string>()
+  for (const r of (data as { contrat_id: string; semaine: string }[]) ?? []) {
+    out.add(`${r.contrat_id}|${r.semaine.slice(0, 10)}`)
+  }
+  return out
+}
+
 export async function getRemunerationPoire(): Promise<RemunerationPoire[]> {
   const supabase = await createClient()
   const { data, error } = await supabase
