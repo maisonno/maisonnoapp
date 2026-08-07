@@ -186,6 +186,23 @@ function PrimeCell({ mois, montant }: { mois: string; montant: number }) {
   )
 }
 
+// Export CSV (séparateur « ; » et BOM : ouverture directe dans Excel en fr-FR).
+// Les décimales passent en virgule pour rester lisibles côté tableur.
+function exportCsv(filename: string, rows: (string | number)[][]) {
+  const cell = (v: string | number) => {
+    const s = String(v ?? '').replace(/\./g, ',')
+    return /[";\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
+  }
+  const csv = rows.map((r) => r.map(cell).join(';')).join('\r\n')
+  const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
 function Msg({ state }: { state: ActionState }) {
   if (state.error) return <div className="msg-err">{state.error}</div>
   if (state.success) return <div className="msg-ok">{state.success}</div>
@@ -247,6 +264,38 @@ function Detail({
 
   // Primes : montant temps plein saisi au mois, proratisé par salarié
   const prim = computePrimes(contratsAnnee, primes, months, heuresTempsPlein)
+
+  // Grille des heures : une fois pour le tableau, les totaux et l'export CSV
+  const heuresGrid = contratsAnnee.map((c) => {
+    const cells = months.map((m) => {
+      const k = `${c.id}|${m}`
+      const reel = hReel.get(k) ?? 0
+      const planif = hProj.get(k) ?? 0
+      const est = estim.parContrat[k]?.heures ?? 0
+      return {
+        reel,
+        est,
+        aVenir: Math.round((planif - reel) * 10) / 10,
+        total: planif + est,
+      }
+    })
+    return { c, cells, total: cells.reduce((s, x) => s + x.total, 0) }
+  })
+
+  // CSV : une colonne par mois + total, plus une ligne de totaux
+  const heuresCsv = [
+    ['Salarié', ...months, 'Total'],
+    ...heuresGrid.map(({ c, cells, total }) => [
+      c.nom_affichage,
+      ...cells.map((x) => (x.total ? x.total.toFixed(2) : '')),
+      total.toFixed(2),
+    ]),
+    [
+      'Total',
+      ...months.map((_, i) => heuresGrid.reduce((s, r) => s + r.cells[i].total, 0).toFixed(2)),
+      heuresGrid.reduce((s, r) => s + r.total, 0).toFixed(2),
+    ],
+  ]
 
   // Coût complet d'un salarié sur un mois, avec le détail du calcul
   const coutCell = (c: Contrat, m: string) => {
@@ -595,7 +644,17 @@ Complément <b>distinct de la prime</b> ci-dessus : il s&apos;y <b>ajoute</b> (v
 
       {/* 4. Heures réalisées / prévisionnelles */}
       <section>
-        <div className="h2">Heures par salarié</div>
+        <div className="h2">
+          Heures par salarié
+          <button
+            className="ghost"
+            type="button"
+            style={{ marginLeft: 'auto' }}
+            onClick={() => exportCsv(`heures_${annee}.csv`, heuresCsv)}
+          >
+            ↓ Export CSV
+          </button>
+        </div>
         <div className="daily">
           <table className="day">
             <thead>
@@ -608,44 +667,43 @@ Complément <b>distinct de la prime</b> ci-dessus : il s&apos;y <b>ajoute</b> (v
               </tr>
             </thead>
             <tbody>
-              {contratsAnnee.map((c) => {
-                let tot = 0
-                return (
-                  <tr key={c.id}>
-                    <td>{c.nom_affichage}</td>
-                    {months.map((m) => {
-                      const r = hReel.get(`${c.id}|${m}`) ?? 0
-                      const planif = hProj.get(`${c.id}|${m}`) ?? 0
-                      const est = estim.parContrat[`${c.id}|${m}`]?.heures ?? 0
-                      const v = planif + est
-                      tot += v
-                      if (!v) return <td key={m}>—</td>
-                      const aVenir = Math.round((planif - r) * 10) / 10
-                      const marques = [
-                        aVenir > 0 ? `${N1(aVenir)} h planifiées à venir` : null,
-                        est > 0 ? `${N1(est)} h estimées (semaines non planifiées)` : null,
-                      ].filter(Boolean)
-                      return (
-                        <td key={m} style={{ color: r ? undefined : 'var(--ink-soft)' }}>
-                          {N1(v)}
-                          {marques.length > 0 ? (
-                            <span
-                              title={[`${N1(r)} h pointées`, ...marques].join(' + ')}
-                              style={{ color: 'var(--ink-soft)' }}
-                            >
-                              {' '}
-                              {est > 0 ? '·e' : '·p'}
-                            </span>
-                          ) : null}
-                        </td>
-                      )
-                    })}
-                    <td>
-                      <b>{N1(tot)}</b>
-                    </td>
-                  </tr>
-                )
-              })}
+              {heuresGrid.map(({ c, cells, total }) => (
+                <tr key={c.id}>
+                  <td>{c.nom_affichage}</td>
+                  {cells.map((x, i) => {
+                    if (!x.total) return <td key={months[i]}>—</td>
+                    const marques = [
+                      x.aVenir > 0 ? `${N1(x.aVenir)} h planifiées à venir` : null,
+                      x.est > 0 ? `${N1(x.est)} h estimées (semaines non planifiées)` : null,
+                    ].filter(Boolean)
+                    return (
+                      <td key={months[i]} style={{ color: x.reel ? undefined : 'var(--ink-soft)' }}>
+                        {N1(x.total)}
+                        {marques.length > 0 ? (
+                          <span
+                            title={[`${N1(x.reel)} h pointées`, ...marques].join(' + ')}
+                            style={{ color: 'var(--ink-soft)' }}
+                          >
+                            {' '}
+                            {x.est > 0 ? '·e' : '·p'}
+                          </span>
+                        ) : null}
+                      </td>
+                    )
+                  })}
+                  <td>
+                    <b>{N1(total)}</b>
+                  </td>
+                </tr>
+              ))}
+              <tr className="tot">
+                <td>Total</td>
+                {months.map((_, i) => {
+                  const t = heuresGrid.reduce((s, r) => s + r.cells[i].total, 0)
+                  return <td key={months[i]}>{t ? N1(t) : '—'}</td>
+                })}
+                <td>{N1(heuresGrid.reduce((s, r) => s + r.total, 0))}</td>
+              </tr>
             </tbody>
           </table>
         </div>
