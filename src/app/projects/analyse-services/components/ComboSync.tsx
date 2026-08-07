@@ -178,6 +178,7 @@ export default function ComboSync() {
                 {r.contratsSansSalaire > 0
                   ? `${r.contratsSansSalaire} sans salaire brut → à compléter dans Détail`
                   : 'salaires bruts récupérés'}
+                {r.contratsSansFin > 0 ? ` · ${r.contratsSansFin} sans date de fin` : ''}
               </div>
             </div>
             <div className="kpi">

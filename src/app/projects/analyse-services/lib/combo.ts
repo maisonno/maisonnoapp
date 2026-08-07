@@ -325,6 +325,47 @@ export const getLocations = () => comboGet<ComboLocation[]>('locations')
 export const getContracts = (locationId: string, day?: string) =>
   comboGet<ComboContract[]>('contracts', { location_id: locationId, day })
 
+// Historique complet d'un contrat : l'original + ses avenants non virtuels.
+// Chaque avenant porte un objet `changes` listant les seuls champs modifiés.
+export type ComboAmendment = ComboContract & { changes?: Record<string, unknown> }
+export type ComboContractHistory = ComboContract & { amendments?: ComboAmendment[] }
+
+export const getContractHistory = (id: string) =>
+  comboGet<ComboContractHistory | null>(`contracts/${encodeURIComponent(id)}/history`)
+
+// Champs d'un contrat qu'un avenant peut modifier et qui nous intéressent.
+const AMENDABLE = [
+  'start_date',
+  'end_date',
+  'contract_end',
+  'contract_type',
+  'contract_time',
+  'working_days_in_week',
+  'function',
+  'monthly_gross_salary',
+  'hourly_gross_salary',
+  'hourly_gross_rate',
+] as const
+
+// Contrat « effectif » : on part de l'original et on applique chronologiquement
+// les `changes` de chaque avenant. C'est la seule façon d'obtenir la vraie date
+// de fin quand un avenant permanent l'a repoussée (ses propres start/end_date
+// décrivent la période de l'avenant, pas celle du contrat).
+export function effectiveContract(hist: ComboContractHistory): ComboContract {
+  const eff: Record<string, unknown> = { ...hist }
+  delete eff.amendments
+  for (const a of hist.amendments ?? []) {
+    const changes = a.changes ?? {}
+    for (const key of AMENDABLE) {
+      const v = changes[key]
+      if (v == null) continue
+      // `contract_end` désigne la fin du contrat, pas celle de la période d'avenant
+      eff[key === 'contract_end' ? 'end_date' : key] = v
+    }
+  }
+  return eff as ComboContract
+}
+
 // Contrats terminés sur une plage (paginé, 50/page)
 export async function getPastContracts(
   locationId: string,

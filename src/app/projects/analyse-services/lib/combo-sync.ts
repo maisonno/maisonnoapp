@@ -3,6 +3,8 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js'
 import {
+  effectiveContract,
+  getContractHistory,
   getContracts,
   getPastContracts,
   getPlannings,
@@ -18,6 +20,7 @@ export type SyncReport = {
   annee: string
   contrats: number
   contratsSansSalaire: number
+  contratsSansFin: number
   shifts: number
   moisAvecHeures: number
   heuresReelles: number
@@ -50,11 +53,28 @@ export async function syncCombo(
   const byLineage = new Map<string, ComboContract>()
   const aliasToLineage = new Map<string, string>()
 
+  // Fusion prudente : une valeur nulle ne doit jamais écraser une valeur connue
+  const merge = (prev: ComboContract | undefined, next: ComboContract): ComboContract => {
+    if (!prev) return { ...next }
+    const out: ComboContract & Record<string, unknown> = { ...prev }
+    for (const [k, v] of Object.entries(next)) {
+      if (v != null) out[k] = v
+    }
+    // La période du contrat est celle de l'original, pas celle d'un avenant :
+    // on garde le début le plus tôt et la fin la plus tardive.
+    if (prev.start_date && next.start_date) {
+      out.start_date = prev.start_date < next.start_date ? prev.start_date : next.start_date
+    }
+    if (prev.end_date && next.end_date) {
+      out.end_date = prev.end_date > next.end_date ? prev.end_date : next.end_date
+    }
+    return out
+  }
+
   const collect = (list: ComboContract[]) => {
     for (const c of list) {
       const key = lineageId(c)
-      // Les mois plus récents écrasent : on garde la dernière version connue
-      byLineage.set(key, { ...(byLineage.get(key) ?? {}), ...c })
+      byLineage.set(key, merge(byLineage.get(key), c))
       aliasToLineage.set(c.id, key)
       if (c.original_contract_id) aliasToLineage.set(c.original_contract_id, key)
     }
@@ -64,6 +84,24 @@ export async function syncCombo(
     collect(await getContracts(locationId, `${ym}-15`))
   }
   collect(await getPastContracts(locationId, `${annee}-01-01`, `${annee}-12-31`))
+
+  // Contrat effectif : l'historique donne la vraie période après avenants
+  // (un avenant permanent laisse end_date à null, la fin réelle est dans `changes`).
+  for (const key of [...byLineage.keys()]) {
+    try {
+      const hist = await getContractHistory(key)
+      if (!hist) continue
+      const eff = effectiveContract(hist)
+      // L'historique fait autorité sur la période (un avenant peut aussi la
+      // raccourcir) : on écrase les dates plutôt que d'appliquer min/max.
+      const merged = merge(byLineage.get(key), eff)
+      if (eff.start_date) merged.start_date = eff.start_date
+      if (eff.end_date) merged.end_date = eff.end_date
+      byLineage.set(key, merged)
+    } catch {
+      // Historique indisponible : on conserve la fusion issue des listes
+    }
+  }
 
   // ─── 2. Upsert des contrats
   const rows = [...byLineage.entries()].map(([key, c]) => ({
@@ -181,6 +219,7 @@ export async function syncCombo(
     annee,
     contrats: rows.length,
     contratsSansSalaire: rows.filter((r) => r.salaire_brut_mensuel == null).length,
+    contratsSansFin: rows.filter((r) => r.date_fin == null).length,
     shifts: shifts.length,
     moisAvecHeures: heuresRows.length,
     heuresReelles: Math.round(totalReel),
