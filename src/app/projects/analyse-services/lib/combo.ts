@@ -7,9 +7,21 @@
 
 export const COMBO_BASE = process.env.COMBO_API_BASE_URL ?? 'https://partner.combohr.com'
 
-export const comboKey = () => process.env.COMBO_API_KEY ?? ''
-const clientId = () => process.env.COMBO_CLIENT_ID ?? ''
-const clientSecret = () => process.env.COMBO_CLIENT_SECRET ?? ''
+// Nettoie une valeur d'environnement : BOM, espaces/retours à la ligne, guillemets
+// et un éventuel préfixe « Bearer » recopié par mégarde. Un seul caractère
+// invisible dans l'en-tête Authorization suffit à provoquer un 401.
+function cleanEnv(raw: string | undefined): string {
+  return (raw ?? '')
+    .replace(/^﻿/, '')
+    .trim()
+    .replace(/^["']([\s\S]*)["']$/, "$1")
+    .replace(/^Bearer\s+/i, '')
+    .trim()
+}
+
+export const comboKey = () => cleanEnv(process.env.COMBO_API_KEY)
+const clientId = () => cleanEnv(process.env.COMBO_CLIENT_ID)
+const clientSecret = () => cleanEnv(process.env.COMBO_CLIENT_SECRET)
 
 export const comboConfigured = () =>
   comboKey().length > 0 || (clientId().length > 0 && clientSecret().length > 0)
@@ -67,24 +79,55 @@ export async function accessToken(): Promise<string> {
 export type ComboAuthDiag = {
   hasApiKey: boolean
   apiKeyLength: number
+  rawLength: number
+  hygiene: string[] // anomalies détectées sur la valeur brute
   hasClientId: boolean
   hasClientSecret: boolean
   base: string
   tokenOk?: boolean
   tokenError?: string
+  probe?: { status: number | null; body: string }
+}
+
+function hygieneOf(raw: string | undefined): string[] {
+  const issues: string[] = []
+  if (raw == null) return issues
+  if (/^﻿/.test(raw)) issues.push('commence par un BOM (caractère invisible)')
+  if (raw !== raw.trim()) issues.push('espaces ou retour à la ligne en début/fin')
+  if (/^["'][\s\S]*["']$/.test(raw.trim())) issues.push('entourée de guillemets')
+  if (/^Bearer\s+/i.test(raw.trim())) issues.push('contient déjà le préfixe « Bearer »')
+  if (/\s/.test(raw.trim())) issues.push('contient une espace interne')
+  return issues
 }
 
 export async function diagnoseAuth(): Promise<ComboAuthDiag> {
+  const raw = process.env.COMBO_API_KEY
+  const key = comboKey()
   const diag: ComboAuthDiag = {
-    hasApiKey: comboKey().length > 0,
-    apiKeyLength: comboKey().length,
+    hasApiKey: key.length > 0,
+    apiKeyLength: key.length,
+    rawLength: (raw ?? '').length,
+    hygiene: hygieneOf(raw),
     hasClientId: clientId().length > 0,
     hasClientSecret: clientSecret().length > 0,
     base: COMBO_BASE,
   }
+
   try {
-    await accessToken()
+    const token = await accessToken()
     diag.tokenOk = true
+    // Sonde /locations pour remonter le message exact de Combo
+    try {
+      const res = await fetch(`${COMBO_BASE}/api/v1/locations`, {
+        headers: { Accept: 'application/json', Authorization: `Bearer ${token}` },
+        signal: AbortSignal.timeout(15000),
+        cache: 'no-store',
+      })
+      const body = await res.text()
+      diag.probe = { status: res.status, body: scrub(body.slice(0, 300), token) }
+    } catch (e) {
+      diag.probe = { status: null, body: scrub((e as Error).message, token) }
+    }
   } catch (e) {
     diag.tokenOk = false
     diag.tokenError = (e as Error).message
@@ -158,13 +201,21 @@ async function comboGet<T>(path: string, params: Record<string, string | undefin
   const url = new URL(`${COMBO_BASE.replace(/\/+$/, '')}/api/v1/${path.replace(/^\/+/, '')}`)
   for (const [k, v] of Object.entries(params)) if (v) url.searchParams.set(k, v)
 
-  let res: Response
-  try {
-    res = await fetch(url, {
-      headers: { Accept: 'application/json', Authorization: `Bearer ${token}` },
+  const call = (authorization: string) =>
+    fetch(url, {
+      headers: { Accept: 'application/json', Authorization: authorization },
       signal: AbortSignal.timeout(20000),
       cache: 'no-store',
     })
+
+  let res: Response
+  try {
+    res = await call(`Bearer ${token}`)
+    // Certaines installations attendent la clé brute plutôt que le préfixe Bearer
+    if (res.status === 401) {
+      const retry = await call(token)
+      if (retry.ok) res = retry
+    }
   } catch (e) {
     throw new ComboError(`Appel ${path} : ${scrub((e as Error).message, token)}`)
   }
