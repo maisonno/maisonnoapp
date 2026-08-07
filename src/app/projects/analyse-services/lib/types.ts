@@ -90,6 +90,12 @@ export type RemunerationPoire = {
   montant: number
 }
 
+// Prime mensuelle de référence (salarié à temps plein)
+export type PrimeMois = {
+  mois: string // 'YYYY-MM-DD' (1er du mois)
+  montant_temps_plein: number
+}
+
 // Salarié issu de l'import Combo (pour rattacher un contrat)
 export type LaborEmploye = {
   employe_hash: string

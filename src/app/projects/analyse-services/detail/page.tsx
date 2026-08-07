@@ -5,6 +5,7 @@ import {
   getContrats,
   getHeuresMois,
   getParam,
+  getPrimes,
   getRemunerationPoire,
   getSemainesPlanifiees,
 } from '../lib/queries'
@@ -25,14 +26,17 @@ export default async function DetailPage({
   if (!user) redirect('/login')
 
   const { annee } = await searchParams
-  const [labor, contrats, remPoire, heures, semainesPlan, tauxCharges] = await Promise.all([
-    getAllLabor(),
-    getContrats(),
-    getRemunerationPoire(),
-    getHeuresMois(),
-    getSemainesPlanifiees(),
-    getParam('taux_charges_patronales', 0.3),
-  ])
+  const [labor, contrats, remPoire, heures, semainesPlan, primes, tauxCharges, heuresTempsPlein] =
+    await Promise.all([
+      getAllLabor(),
+      getContrats(),
+      getRemunerationPoire(),
+      getHeuresMois(),
+      getSemainesPlanifiees(),
+      getPrimes(),
+      getParam('taux_charges_patronales', 0.3),
+      getParam('heures_temps_plein', 39),
+    ])
 
   const anneesSet = new Set<string>([
     ...labor.map((l) => l.periode.slice(0, 4)),
@@ -51,6 +55,8 @@ export default async function DetailPage({
         remPoire={remPoire}
         heures={heures}
         semainesPlan={semainesPlan}
+        primes={primes}
+        heuresTempsPlein={heuresTempsPlein}
         tauxCharges={tauxCharges}
         annee={anneeActive}
         anneesDispo={anneesDispo}

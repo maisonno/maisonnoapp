@@ -9,6 +9,7 @@ import {
   getHeuresMois,
   getParam,
   getPinsaMonthly,
+  getPrimes,
   getRemunerationPoire,
   getSemainesPlanifiees,
 } from './lib/queries'
@@ -36,7 +37,17 @@ export default async function AnalyseServicesPage({
 
   // ─── Onglet Coûts salariaux ───
   if (tab === 'salaires') {
-    const [tickets, labor, contrats, heures, remPoire, semainesPlan, tauxCharges] =
+    const [
+      tickets,
+      labor,
+      contrats,
+      heures,
+      remPoire,
+      semainesPlan,
+      primes,
+      tauxCharges,
+      heuresTempsPlein,
+    ] =
       await Promise.all([
         getAllTicketMetrics(),
         getAllLabor(),
@@ -44,7 +55,9 @@ export default async function AnalyseServicesPage({
         getHeuresMois(),
         getRemunerationPoire(),
         getSemainesPlanifiees(),
+        getPrimes(),
         getParam('taux_charges_patronales', 0.3),
+        getParam('heures_temps_plein', 39),
       ])
 
     // CA TTC par mois (pour le % masse salariale / CA)
@@ -71,6 +84,8 @@ export default async function AnalyseServicesPage({
           contrats={contrats}
           heures={heures}
           semainesPlan={semainesPlan}
+          primes={primes}
+          heuresTempsPlein={heuresTempsPlein}
           remPoire={remPoire}
           tauxCharges={tauxCharges}
           annee={anneeActive}

@@ -2,11 +2,13 @@
 
 import { useActionState, useEffect, useState, useTransition } from 'react'
 import Link from 'next/link'
-import type { Contrat, HeuresMois, LaborRow, RemunerationPoire } from '../lib/types'
+import type { Contrat, HeuresMois, LaborRow, PrimeMois, RemunerationPoire } from '../lib/types'
 import {
   aggregateFromCombo,
+  computePrimes,
   coutGlobal,
   estimateUnplannedWeeks,
+  quotiteContrat,
   labelOfYm,
   monthsOfYear,
   poireByMonth,
@@ -18,6 +20,7 @@ import {
   deleteContrat,
   saveContrat,
   saveParam,
+  savePrime,
   saveRemunerationPoire,
   type ActionState,
 } from '../actions'
@@ -31,6 +34,8 @@ type Props = {
   remPoire: RemunerationPoire[]
   heures: HeuresMois[]
   semainesPlan: Set<string>
+  primes: PrimeMois[]
+  heuresTempsPlein: number
   tauxCharges: number
   annee: string
   anneesDispo: string[]
@@ -145,6 +150,41 @@ function PoireCell({
   )
 }
 
+// Montant mensuel de la prime pour un salarié à temps plein
+function PrimeCell({ mois, montant }: { mois: string; montant: number }) {
+  const [pending, startTransition] = useTransition()
+  const [value, setValue] = useState(montant ? String(montant) : '')
+
+  const commit = () => {
+    const next = value.trim()
+    const before = montant ? String(montant) : ''
+    if (next === before) return
+    const fd = new FormData()
+    fd.set('mois', mois)
+    fd.set('montant', next || '0')
+    startTransition(async () => {
+      await savePrime({} as ActionState, fd)
+    })
+  }
+
+  return (
+    <input
+      type="number"
+      step="1"
+      inputMode="decimal"
+      value={value}
+      placeholder="—"
+      disabled={pending}
+      onChange={(e) => setValue(e.target.value)}
+      onBlur={commit}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
+      }}
+      style={{ opacity: pending ? 0.5 : 1 }}
+    />
+  )
+}
+
 function Msg({ state }: { state: ActionState }) {
   if (state.error) return <div className="msg-err">{state.error}</div>
   if (state.success) return <div className="msg-ok">{state.success}</div>
@@ -157,6 +197,8 @@ function Detail({
   remPoire,
   heures,
   semainesPlan,
+  primes,
+  heuresTempsPlein,
   tauxCharges,
   annee,
   anneesDispo,
@@ -196,6 +238,9 @@ function Detail({
   for (const ym of combo.months) if (ym.startsWith(annee)) real[ym] = combo.brut[ym]
 
   const poireParMois = poireByMonth(remPoire.filter((r) => r.mois.startsWith(annee)))
+
+  // Primes : montant temps plein saisi au mois, proratisé par salarié
+  const prim = computePrimes(contratsAnnee, primes, months, heuresTempsPlein)
 
   return (
     <>
@@ -374,7 +419,94 @@ function Detail({
         </div>
       </section>
 
-      {/* 2. Complément de rémunération Poire */}
+      {/* 2. Primes versées en Poire */}
+      <section>
+        <div className="h2">
+          Primes <span className="tag">versées en Poire · cash · hors charges</span>
+        </div>
+
+        <div className="daily">
+          <table className="day">
+            <thead>
+              <tr>
+                <th>Prime mensuelle</th>
+                {months.map((m) => (
+                  <th key={m}>{m.slice(5)}</th>
+                ))}
+                <th>Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>
+                  <b>Référence temps plein</b>
+                  <div className="partial">{N1(heuresTempsPlein)} h/semaine</div>
+                </td>
+                {months.map((m) => (
+                  <td key={m}>
+                    <PrimeCell mois={m} montant={prim.montantParMois[m] ?? 0} />
+                  </td>
+                ))}
+                <td>—</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div className="daily" style={{ marginTop: 12 }}>
+          <table className="day">
+            <thead>
+              <tr>
+                <th>Salarié</th>
+                <th>Quotité</th>
+                {months.map((m) => (
+                  <th key={m}>{m.slice(5)}</th>
+                ))}
+                <th>Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              {contratsAnnee.map((c) => {
+                let tot = 0
+                const q = quotiteContrat(c, heuresTempsPlein)
+                return (
+                  <tr key={c.id}>
+                    <td>{c.nom_affichage}</td>
+                    <td style={{ color: 'var(--ink-soft)' }}>{q ? PCT(q * 100) : '—'}</td>
+                    {months.map((m) => {
+                      const v = prim.parContrat[`${c.id}|${m}`] ?? 0
+                      tot += v
+                      return <td key={m}>{v ? EUR(v) : '—'}</td>
+                    })}
+                    <td>
+                      <b>{EUR(tot)}</b>
+                    </td>
+                  </tr>
+                )
+              })}
+              <tr className="tot">
+                <td>Total</td>
+                <td>—</td>
+                {months.map((m) => (
+                  <td key={m}>{prim.parMois[m] ? EUR(prim.parMois[m]) : '—'}</td>
+                ))}
+                <td>{EUR(Object.values(prim.parMois).reduce((a, b) => a + b, 0))}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div className="foot">
+          Saisis le <b>montant mensuel pour un salarié à temps plein</b> dans la première ligne ; le montant de
+          chaque salarié se calcule automatiquement :
+          <br />
+          prime = montant × <b>quotité</b> (heures hebdo <b>contractuelles</b> ÷ {N1(heuresTempsPlein)} h, plafonnée
+          à 100 %) × <b>prorata</b> des jours du mois couverts par le contrat. Ce sont bien les heures
+          contractuelles qui comptent, pas les heures réalisées. Versée en cash, la prime n&apos;est pas soumise
+          aux charges : elle s&apos;ajoute au coût global après le coefficient de charges.
+        </div>
+      </section>
+
+      {/* 3. Complément de rémunération Poire */}
       <section>
         <div className="h2">
           Complément de rémunération « Poire » <span className="tag">cash · hors charges</span>
@@ -422,13 +554,14 @@ function Detail({
           </table>
         </div>
         <div className="foot">
-          Versé en <b>cash</b>, ce complément <b>n&apos;est pas soumis aux charges sociales</b> : il est ajouté au
-          coût global <b>après</b> application du coefficient de charges. Saisis directement dans les cellules —
-          l&apos;enregistrement se fait en quittant le champ (vide ou 0 = suppression).
+Complément <b>distinct de la prime</b> ci-dessus : il s&apos;y <b>ajoute</b> (versements
+          exceptionnels, rattrapages…). Versé en <b>cash</b>, il <b>n&apos;est pas soumis aux charges sociales</b>{' '}
+          et vient donc s&apos;ajouter au coût global <b>après</b> le coefficient de charges. Saisis directement
+          dans les cellules — l&apos;enregistrement se fait en quittant le champ (vide ou 0 = suppression).
         </div>
       </section>
 
-      {/* 3. Heures réalisées / prévisionnelles */}
+      {/* 4. Heures réalisées / prévisionnelles */}
       <section>
         <div className="h2">Heures par salarié</div>
         <div className="daily">
@@ -497,7 +630,7 @@ function Detail({
         </div>
       </section>
 
-      {/* 4. Détail du calcul du coût global */}
+      {/* 5. Détail du calcul du coût global */}
       <section>
         <div className="h2">
           Détail du calcul du coût global <span className="tag">réalisé {annee}</span>
@@ -514,6 +647,7 @@ function Detail({
                 <th>CP (10 %)</th>
                 <th>Brut</th>
                 <th>Charges ({PCT(tauxCharges * 100)})</th>
+                <th>Prime</th>
                 <th>Compl. Poire</th>
                 <th>Coût global</th>
               </tr>
@@ -524,6 +658,7 @@ function Detail({
                 if (!d) return null
                 const charges = d.brut * tauxCharges
                 const pr = poireParMois[m] || 0
+                const pm = prim.parMois[m] || 0
                 return (
                   <tr key={m}>
                     <td>{labelOfYm(m)}</td>
@@ -536,9 +671,10 @@ function Detail({
                       <b>{EUR(d.brut)}</b>
                     </td>
                     <td>{EUR(charges)}</td>
+                    <td className="poire">{pm ? EUR(pm) : '—'}</td>
                     <td className="poire">{pr ? EUR(pr) : '—'}</td>
                     <td>
-                      <b>{EUR(coutGlobal(d.brut, tauxCharges, pr))}</b>
+                      <b>{EUR(coutGlobal(d.brut, tauxCharges, pr + pm))}</b>
                     </td>
                   </tr>
                 )
@@ -557,9 +693,10 @@ function Detail({
                       cp: a.cp + d.cp,
                       brut: a.brut + d.brut,
                       poire: a.poire + pr,
+                      prime: a.prime + (prim.parMois[m] || 0),
                     }
                   },
-                  { base: 0, supp: 0, ferie: 0, sixieme: 0, cp: 0, brut: 0, poire: 0 },
+                  { base: 0, supp: 0, ferie: 0, sixieme: 0, cp: 0, brut: 0, poire: 0, prime: 0 },
                 )
                 return (
                   <tr className="tot">
@@ -571,8 +708,9 @@ function Detail({
                     <td>{EUR(tot.cp)}</td>
                     <td>{EUR(tot.brut)}</td>
                     <td>{EUR(tot.brut * tauxCharges)}</td>
+                    <td>{EUR(tot.prime)}</td>
                     <td>{EUR(tot.poire)}</td>
-                    <td>{EUR(coutGlobal(tot.brut, tauxCharges, tot.poire))}</td>
+                    <td>{EUR(coutGlobal(tot.brut, tauxCharges, tot.poire + tot.prime))}</td>
                   </tr>
                 )
               })()}
@@ -587,7 +725,8 @@ function Detail({
           Brut = salaire de base + majoration des heures supp hors contrat (×1,10 / ×1,20 / ×1,50 au taux horaire
           contractuel) + fériés et 1er mai (+100 %) + 6ème jour (base ÷ 6, « 6 jours payés 7 »), le tout majoré
           de la provision congés payés (+10 %). Pas de majoration de nuit (convention CHR). Coût global = brut ×
-          (1 + charges patronales) + complément Poire (non chargé).
+          (1 + charges patronales) + <b>prime</b> et <b>complément Poire</b>, tous deux versés en cash et donc
+          non chargés.
         </div>
       </section>
     </>

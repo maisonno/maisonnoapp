@@ -10,7 +10,7 @@
 //  - provision congés payés : +10 % sur l'ensemble ;
 //  - complément « Poire » : cash, NON soumis aux charges → ajouté après charges.
 
-import type { Contrat, HeuresMois, LaborRow, RemunerationPoire } from './types'
+import type { Contrat, HeuresMois, LaborRow, PrimeMois, RemunerationPoire } from './types'
 
 export const CP_RATE = 0.1 // provision congés payés
 export const SIXTH_DAY = 1 / 6 // « 6 jours payés 7 »
@@ -400,6 +400,65 @@ export function prevHeuresByMonth(contrats: Contrat[], months: string[]): Record
     out[ym] = h
   }
   return out
+}
+
+// ─── Primes mensuelles versées en Poire ───
+// prime = montant temps plein
+//       × (heures hebdo CONTRACTUELLES / heures temps plein), plafonné à 1
+//       × prorata des jours du mois couverts par le contrat
+//
+// La prime S'AJOUTE au complément Poire saisi manuellement : ce sont deux
+// versements distincts, tous deux en cash et donc hors charges patronales.
+
+export const TEMPS_PLEIN_DEFAUT = 39
+
+export function quotiteContrat(c: Contrat, heuresTempsPlein: number): number {
+  const h = c.heures_hebdo_contrat ?? 0
+  if (h <= 0 || heuresTempsPlein <= 0) return 0
+  return Math.min(1, h / heuresTempsPlein)
+}
+
+export function primeCalculee(
+  c: Contrat,
+  ym: string,
+  montantTempsPlein: number,
+  heuresTempsPlein: number,
+): number {
+  if (!montantTempsPlein) return 0
+  const frac = activeFraction(c, ym)
+  if (frac <= 0) return 0
+  return montantTempsPlein * quotiteContrat(c, heuresTempsPlein) * frac
+}
+
+export type PrimesResult = {
+  parContrat: Record<string, number> // `${contratId}|${ym}` → prime calculée
+  parMois: Record<string, number> // total par mois
+  montantParMois: Record<string, number> // référence temps plein saisie
+}
+
+export function computePrimes(
+  contrats: Contrat[],
+  primes: PrimeMois[],
+  months: string[],
+  heuresTempsPlein: number,
+): PrimesResult {
+  const montantParMois: Record<string, number> = {}
+  for (const p of primes) montantParMois[ymOf(p.mois)] = p.montant_temps_plein || 0
+
+  const parContrat: Record<string, number> = {}
+  const parMois: Record<string, number> = {}
+
+  for (const ym of months) {
+    const montant = montantParMois[ym] || 0
+    if (!montant) continue
+    for (const c of contrats) {
+      const v = primeCalculee(c, ym, montant, heuresTempsPlein)
+      if (!v) continue
+      parContrat[`${c.id}|${ym}`] = v
+      parMois[ym] = (parMois[ym] || 0) + v
+    }
+  }
+  return { parContrat, parMois, montantParMois }
 }
 
 // Complément Poire par mois (cash, hors charges)
