@@ -10,6 +10,7 @@ import {
   getParam,
   getPinsaMonthly,
   getRemunerationPoire,
+  getSemainesPlanifiees,
 } from './lib/queries'
 import Dashboard from './components/Dashboard'
 import CoutsSalariaux from './components/CoutsSalariaux'
@@ -35,14 +36,16 @@ export default async function AnalyseServicesPage({
 
   // ─── Onglet Coûts salariaux ───
   if (tab === 'salaires') {
-    const [tickets, labor, contrats, heures, remPoire, tauxCharges] = await Promise.all([
-      getAllTicketMetrics(),
-      getAllLabor(),
-      getContrats(),
-      getHeuresMois(),
-      getRemunerationPoire(),
-      getParam('taux_charges_patronales', 0.3),
-    ])
+    const [tickets, labor, contrats, heures, remPoire, semainesPlan, tauxCharges] =
+      await Promise.all([
+        getAllTicketMetrics(),
+        getAllLabor(),
+        getContrats(),
+        getHeuresMois(),
+        getRemunerationPoire(),
+        getSemainesPlanifiees(),
+        getParam('taux_charges_patronales', 0.3),
+      ])
 
     // CA TTC par mois (pour le % masse salariale / CA)
     const caByMonth: Record<string, number> = {}
@@ -67,6 +70,7 @@ export default async function AnalyseServicesPage({
           labor={labor}
           contrats={contrats}
           heures={heures}
+          semainesPlan={semainesPlan}
           remPoire={remPoire}
           tauxCharges={tauxCharges}
           annee={anneeActive}

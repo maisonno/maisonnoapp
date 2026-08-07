@@ -6,6 +6,7 @@ import type { Contrat, HeuresMois, LaborRow, RemunerationPoire } from '../lib/ty
 import {
   aggregateFromCombo,
   coutGlobal,
+  estimateUnplannedWeeks,
   labelOfYm,
   monthsOfYear,
   poireByMonth,
@@ -29,6 +30,7 @@ type Props = {
   contrats: Contrat[]
   remPoire: RemunerationPoire[]
   heures: HeuresMois[]
+  semainesPlan: Set<string>
   tauxCharges: number
   annee: string
   anneesDispo: string[]
@@ -149,7 +151,16 @@ function Msg({ state }: { state: ActionState }) {
   return null
 }
 
-function Detail({ labor, contrats, remPoire, heures, tauxCharges, annee, anneesDispo }: Props) {
+function Detail({
+  labor,
+  contrats,
+  remPoire,
+  heures,
+  semainesPlan,
+  tauxCharges,
+  annee,
+  anneesDispo,
+}: Props) {
   const months = monthsOfYear(annee)
   const [edit, setEdit] = useState<Contrat | null>(null)
 
@@ -174,6 +185,9 @@ function Detail({ labor, contrats, remPoire, heures, tauxCharges, annee, anneesD
       (hProj.get(k) || 0) + (h.heures_projetees ?? h.heures_reelles ?? 0),
     )
   }
+
+  // Semaines futures non planifiées → heures estimées (horaire cible au prorata)
+  const estim = estimateUnplannedWeeks(contratsAnnee, semainesPlan, annee)
 
   // Coût réalisé : données Combo en priorité, repli sur l'ancien import fichier
   const combo = aggregateFromCombo(contrats, heures, 'reel')
@@ -436,20 +450,26 @@ function Detail({ labor, contrats, remPoire, heures, tauxCharges, annee, anneesD
                     <td>{c.nom_affichage}</td>
                     {months.map((m) => {
                       const r = hReel.get(`${c.id}|${m}`) ?? 0
-                      const v = hProj.get(`${c.id}|${m}`) ?? 0
+                      const planif = hProj.get(`${c.id}|${m}`) ?? 0
+                      const est = estim.parContrat[`${c.id}|${m}`]?.heures ?? 0
+                      const v = planif + est
                       tot += v
                       if (!v) return <td key={m}>—</td>
-                      const aVenir = Math.round((v - r) * 10) / 10
+                      const aVenir = Math.round((planif - r) * 10) / 10
+                      const marques = [
+                        aVenir > 0 ? `${N1(aVenir)} h planifiées à venir` : null,
+                        est > 0 ? `${N1(est)} h estimées (semaines non planifiées)` : null,
+                      ].filter(Boolean)
                       return (
                         <td key={m} style={{ color: r ? undefined : 'var(--ink-soft)' }}>
                           {N1(v)}
-                          {aVenir > 0 ? (
+                          {marques.length > 0 ? (
                             <span
-                              title={`${N1(r)} h pointées + ${N1(aVenir)} h planifiées à venir`}
+                              title={[`${N1(r)} h pointées`, ...marques].join(' + ')}
                               style={{ color: 'var(--ink-soft)' }}
                             >
                               {' '}
-                              ·p
+                              {est > 0 ? '·e' : '·p'}
                             </span>
                           ) : null}
                         </td>
@@ -466,10 +486,14 @@ function Detail({ labor, contrats, remPoire, heures, tauxCharges, annee, anneesD
         </div>
         <div className="foot">
           Heures issues des <b>plannings ComboHR</b>, combinées <b>shift par shift</b> : un shift déjà effectué
-          compte ses heures <b>pointées</b>, un shift à venir ses heures <b>planifiées</b>. Le total d&apos;un
-          mois en cours inclut donc le reste du planning — le suffixe « ·p » signale les mois qui contiennent des
-          heures encore à venir (survole pour voir la répartition pointé / à venir). Un mois sans planning
-          affiche « — » : aucune heure n&apos;est inventée, la fermeture hivernale apparaît telle quelle.
+          compte ses heures <b>pointées</b>, un shift à venir ses heures <b>planifiées</b>. Au-delà du{' '}
+          <b>dernier shift planifié</b> (l&apos;horizon de planification), on ajoute une <b>estimation</b> =
+          horaire hebdo cible (à défaut l&apos;horaire contractuel) au prorata des jours couverts par le contrat
+          {estim.horizon
+            ? ` — planning saisi jusqu'à la semaine du ${estim.horizon}, ${estim.semaines} semaine(s) estimée(s) au-delà`
+            : ''}. Suffixes : « ·p » heures planifiées à venir, « ·e » heures estimées (survole pour le détail).
+          En deçà de l&apos;horizon, une semaine sans shift signifie que le salarié ne travaille pas : rien
+          n&apos;est estimé, et la fermeture hivernale apparaît telle quelle.
         </div>
       </section>
 
