@@ -62,6 +62,7 @@ export type Contrat = {
   poste: string | null
   contrat: string | null
   employe_hash: string | null
+  combo_contract_id: string | null
   date_debut: string | null // 'YYYY-MM-DD'
   date_fin: string | null
   heures_hebdo_contrat: number | null

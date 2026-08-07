@@ -82,7 +82,7 @@ export async function getContrats(): Promise<Contrat[]> {
   const { data, error } = await supabase
     .from('ana_contrats')
     .select(
-      'id,nom_affichage,poste,contrat,employe_hash,date_debut,date_fin,' +
+      'id,nom_affichage,poste,contrat,employe_hash,combo_contract_id,date_debut,date_fin,' +
         'heures_hebdo_contrat,salaire_brut_mensuel,heures_hebdo_cible,actif',
     )
     .order('nom_affichage', { ascending: true })

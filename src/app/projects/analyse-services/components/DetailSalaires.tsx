@@ -1,14 +1,14 @@
 'use client'
 
-import { useActionState, useEffect, useState } from 'react'
+import { useActionState, useEffect, useState, useTransition } from 'react'
 import Link from 'next/link'
-import type { Contrat, LaborEmploye, LaborRow, RemunerationPoire } from '../lib/types'
+import type { Contrat, HeuresMois, LaborRow, RemunerationPoire } from '../lib/types'
 import {
+  aggregateFromCombo,
   coutGlobal,
   labelOfYm,
   monthsOfYear,
   poireByMonth,
-  prevHeures,
   realiseByMonth,
   ymOf,
 } from '../lib/labor'
@@ -28,10 +28,19 @@ type Props = {
   labor: LaborRow[]
   contrats: Contrat[]
   remPoire: RemunerationPoire[]
-  employes: LaborEmploye[]
+  heures: HeuresMois[]
   tauxCharges: number
   annee: string
   anneesDispo: string[]
+}
+
+// Un contrat concerne l'année si sa période la chevauche
+function concerneAnnee(c: Contrat, annee: string): boolean {
+  const debutAnnee = `${annee}-01-01`
+  const finAnnee = `${annee}-12-31`
+  if (c.date_debut && c.date_debut > finAnnee) return false
+  if (c.date_fin && c.date_fin < debutAnnee) return false
+  return true
 }
 
 export default function DetailSalaires(props: Props) {
@@ -89,38 +98,86 @@ function Lock({ onOk }: { onOk: () => void }) {
   )
 }
 
+// Cellule éditable du tableau « Complément Poire » : enregistre à la sortie du
+// champ (ou sur Entrée) via la Server Action, sans bouton.
+function PoireCell({
+  contratId,
+  mois,
+  montant,
+}: {
+  contratId: string
+  mois: string
+  montant: number
+}) {
+  const [pending, startTransition] = useTransition()
+  const [value, setValue] = useState(montant ? String(montant) : '')
+
+  const commit = () => {
+    const next = value.trim()
+    const before = montant ? String(montant) : ''
+    if (next === before) return
+    const fd = new FormData()
+    fd.set('contrat_id', contratId)
+    fd.set('mois', mois)
+    fd.set('montant', next || '0')
+    startTransition(async () => {
+      await saveRemunerationPoire({} as ActionState, fd)
+    })
+  }
+
+  return (
+    <input
+      type="number"
+      step="0.01"
+      inputMode="decimal"
+      value={value}
+      placeholder="—"
+      disabled={pending}
+      onChange={(e) => setValue(e.target.value)}
+      onBlur={commit}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
+      }}
+      style={{ opacity: pending ? 0.5 : 1 }}
+    />
+  )
+}
+
 function Msg({ state }: { state: ActionState }) {
   if (state.error) return <div className="msg-err">{state.error}</div>
   if (state.success) return <div className="msg-ok">{state.success}</div>
   return null
 }
 
-function Detail({ labor, contrats, remPoire, employes, tauxCharges, annee, anneesDispo }: Props) {
+function Detail({ labor, contrats, remPoire, heures, tauxCharges, annee, anneesDispo }: Props) {
   const months = monthsOfYear(annee)
   const [edit, setEdit] = useState<Contrat | null>(null)
-  const [poireCell, setPoireCell] = useState<{ contrat_id: string; mois: string } | null>(null)
 
   const [contratState, contratAction] = useActionState(saveContrat, {} as ActionState)
   const [delState, delAction] = useActionState(deleteContrat, {} as ActionState)
-  const [poireState, poireAction] = useActionState(saveRemunerationPoire, {} as ActionState)
   const [paramState, paramAction] = useActionState(saveParam, {} as ActionState)
+
+  // Contrats de l'année sélectionnée uniquement
+  const contratsAnnee = contrats.filter((c) => concerneAnnee(c, annee))
 
   const poireMap = new Map<string, number>()
   for (const r of remPoire) poireMap.set(`${r.contrat_id}|${ymOf(r.mois)}`, r.montant)
 
-  // Heures réalisées par contrat × mois (rattachement via employe_hash)
-  const contratByHash = new Map<string, string>()
-  for (const c of contrats) if (c.employe_hash) contratByHash.set(c.employe_hash, c.id)
-  const heuresReal = new Map<string, number>()
-  for (const l of labor) {
-    if (!l.heures_travaillees || !l.employe_hash) continue
-    const cid = contratByHash.get(l.employe_hash)
-    if (!cid) continue
-    const k = `${cid}|${ymOf(l.periode)}`
-    heuresReal.set(k, (heuresReal.get(k) || 0) + l.heures_travaillees)
+  // Heures issues des plannings Combo (réelles + planifiées), par contrat × mois
+  const hReel = new Map<string, number>()
+  const hPrev = new Map<string, number>()
+  for (const h of heures) {
+    const k = `${h.contrat_id}|${ymOf(h.mois)}`
+    hReel.set(k, (hReel.get(k) || 0) + (h.heures_reelles || 0))
+    hPrev.set(k, (hPrev.get(k) || 0) + (h.heures_planifiees || 0))
   }
 
-  const real = realiseByMonth(labor.filter((l) => l.periode.startsWith(annee)))
+  // Coût réalisé : données Combo en priorité, repli sur l'ancien import fichier
+  const combo = aggregateFromCombo(contrats, heures, 'reel')
+  const fichier = realiseByMonth(labor.filter((l) => l.periode.startsWith(annee)))
+  const real: typeof fichier = { ...fichier }
+  for (const ym of combo.months) if (ym.startsWith(annee)) real[ym] = combo.brut[ym]
+
   const poireParMois = poireByMonth(remPoire.filter((r) => r.mois.startsWith(annee)))
 
   return (
@@ -156,10 +213,10 @@ function Detail({ labor, contrats, remPoire, employes, tauxCharges, annee, annee
             <input
               type="number"
               name="valeur"
-              step="0.01"
+              step="0.1"
               min="0"
-              max="1"
-              defaultValue={tauxCharges}
+              max="100"
+              defaultValue={Math.round(tauxCharges * 1000) / 10}
               style={{ width: 100 }}
             />
             <button className="btn btn-ghost" type="submit">
@@ -178,7 +235,10 @@ function Detail({ labor, contrats, remPoire, employes, tauxCharges, annee, annee
       {/* 1. Contrats */}
       <section>
         <div className="h2">
-          Contrats <span className="tag">{contrats.length} salarié(s)</span>
+          Contrats{' '}
+          <span className="tag">
+            {contratsAnnee.length} contrat(s) actifs en {annee}
+          </span>
         </div>
         <Msg state={contratState} />
         <Msg state={delState} />
@@ -218,20 +278,6 @@ function Detail({ labor, contrats, remPoire, employes, tauxCharges, annee, annee
             <input type="number" step="0.5" name="heures_hebdo_cible" defaultValue={edit?.heures_hebdo_cible ?? ''} key={`hb${edit?.id ?? 'new'}`} />
           </div>
           <div>
-            <label>Lien import Combo</label>
-            <select name="employe_hash" defaultValue={edit?.employe_hash ?? ''} key={`h${edit?.id ?? 'new'}`}>
-              <option value="">— aucun —</option>
-              {employes.map((e) => (
-                <option key={e.employe_hash} value={e.employe_hash}>
-                  {e.prenom || e.nom
-                    ? `${e.prenom ?? ''} ${e.nom ?? ''}`.trim()
-                    : `${e.poste ?? '?'} · ${e.contrat ?? '?'}`}{' '}
-                  · {EUR(e.salaire_base)}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
             <label>Actif</label>
             <select name="actif" defaultValue={edit ? String(edit.actif) : 'true'} key={`a${edit?.id ?? 'new'}`}>
               <option value="true">Oui</option>
@@ -260,19 +306,19 @@ function Detail({ labor, contrats, remPoire, employes, tauxCharges, annee, annee
                 <th>H. hebdo</th>
                 <th>Brut mensuel</th>
                 <th>H. cible</th>
-                <th>Combo</th>
+                <th>Source</th>
                 <th></th>
               </tr>
             </thead>
             <tbody>
-              {contrats.length === 0 ? (
+              {contratsAnnee.length === 0 ? (
                 <tr>
                   <td colSpan={8} style={{ color: 'var(--ink-soft)' }}>
-                    Aucun contrat saisi.
+                    Aucun contrat actif en {annee}.
                   </td>
                 </tr>
               ) : (
-                contrats.map((c) => (
+                contratsAnnee.map((c) => (
                   <tr key={c.id} style={{ opacity: c.actif ? 1 : 0.5 }}>
                     <td>
                       <b>{c.nom_affichage}</b>
@@ -285,7 +331,7 @@ function Detail({ labor, contrats, remPoire, employes, tauxCharges, annee, annee
                     <td>{c.heures_hebdo_contrat != null ? N1(c.heures_hebdo_contrat) : '—'}</td>
                     <td>{c.salaire_brut_mensuel != null ? EUR(c.salaire_brut_mensuel) : '⚠️ à saisir'}</td>
                     <td>{c.heures_hebdo_cible != null ? N1(c.heures_hebdo_cible) : '—'}</td>
-                    <td>{c.employe_hash ? '✓' : '—'}</td>
+                    <td>{c.combo_contract_id ? 'ComboHR' : 'saisie'}</td>
                     <td style={{ whiteSpace: 'nowrap' }}>
                       <button className="ghost" type="button" onClick={() => setEdit(c)}>
                         Modifier
@@ -316,48 +362,6 @@ function Detail({ labor, contrats, remPoire, employes, tauxCharges, annee, annee
         <div className="h2">
           Complément de rémunération « Poire » <span className="tag">cash · hors charges</span>
         </div>
-        <Msg state={poireState} />
-        <form action={poireAction} className="frm">
-          <div>
-            <label>Salarié</label>
-            <select name="contrat_id" defaultValue={poireCell?.contrat_id ?? ''} key={`pc${poireCell?.contrat_id ?? ''}`} required>
-              <option value="">— choisir —</option>
-              {contrats.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.nom_affichage}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label>Mois</label>
-            <select name="mois" defaultValue={poireCell?.mois ?? months[0]} key={`pm${poireCell?.mois ?? ''}`} required>
-              {months.map((m) => (
-                <option key={m} value={m}>
-                  {labelOfYm(m)}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label>Montant (€)</label>
-            <input
-              type="number"
-              step="0.01"
-              name="montant"
-              defaultValue={
-                poireCell ? (poireMap.get(`${poireCell.contrat_id}|${poireCell.mois}`) ?? '') : ''
-              }
-              key={`pv${poireCell?.contrat_id ?? ''}${poireCell?.mois ?? ''}`}
-            />
-          </div>
-          <div>
-            <button className="btn btn-primary" type="submit">
-              Enregistrer
-            </button>
-          </div>
-        </form>
-
         <div className="daily">
           <table className="day">
             <thead>
@@ -370,7 +374,7 @@ function Detail({ labor, contrats, remPoire, employes, tauxCharges, annee, annee
               </tr>
             </thead>
             <tbody>
-              {contrats.map((c) => {
+              {contratsAnnee.map((c) => {
                 let tot = 0
                 return (
                   <tr key={c.id}>
@@ -379,13 +383,8 @@ function Detail({ labor, contrats, remPoire, employes, tauxCharges, annee, annee
                       const v = poireMap.get(`${c.id}|${m}`) ?? 0
                       tot += v
                       return (
-                        <td
-                          key={m}
-                          onClick={() => setPoireCell({ contrat_id: c.id, mois: m })}
-                          style={{ cursor: 'pointer' }}
-                          title="Cliquer pour modifier"
-                        >
-                          {v ? EUR(v) : '—'}
+                        <td key={m}>
+                          <PoireCell contratId={c.id} mois={m} montant={v} />
                         </td>
                       )
                     })}
@@ -407,8 +406,8 @@ function Detail({ labor, contrats, remPoire, employes, tauxCharges, annee, annee
         </div>
         <div className="foot">
           Versé en <b>cash</b>, ce complément <b>n&apos;est pas soumis aux charges sociales</b> : il est ajouté au
-          coût global <b>après</b> application du coefficient de charges. Clique une cellule pour la modifier
-          (montant 0 = suppression).
+          coût global <b>après</b> application du coefficient de charges. Saisis directement dans les cellules —
+          l&apos;enregistrement se fait en quittant le champ (vide ou 0 = suppression).
         </div>
       </section>
 
@@ -427,20 +426,21 @@ function Detail({ labor, contrats, remPoire, employes, tauxCharges, annee, annee
               </tr>
             </thead>
             <tbody>
-              {contrats.map((c) => {
+              {contratsAnnee.map((c) => {
                 let tot = 0
                 return (
                   <tr key={c.id}>
                     <td>{c.nom_affichage}</td>
                     {months.map((m) => {
-                      const r = heuresReal.get(`${c.id}|${m}`)
-                      const p = prevHeures(c, m)
-                      const v = r ?? p
+                      const r = hReel.get(`${c.id}|${m}`) ?? 0
+                      const p = hPrev.get(`${c.id}|${m}`) ?? 0
+                      const v = r || p
                       tot += v
+                      if (!v) return <td key={m}>—</td>
                       return (
-                        <td key={m} style={{ color: r == null && p > 0 ? 'var(--ink-soft)' : undefined }}>
-                          {v > 0 ? N1(v) : '—'}
-                          {r == null && p > 0 ? <span title="prévisionnel"> ·p</span> : null}
+                        <td key={m} style={{ color: r ? undefined : 'var(--ink-soft)' }}>
+                          {N1(v)}
+                          {r ? null : <span title="planifié, non encore pointé"> ·p</span>}
                         </td>
                       )
                     })}
@@ -454,9 +454,9 @@ function Detail({ labor, contrats, remPoire, employes, tauxCharges, annee, annee
           </table>
         </div>
         <div className="foot">
-          Heures <b>réalisées</b> issues de l&apos;import Combo (contrats rattachés). Quand le mois n&apos;a pas
-          de données Combo, on affiche le <b>prévisionnel</b> (suffixe « ·p ») calculé depuis les heures hebdo
-          cible, au prorata de la période de contrat.
+          Heures issues des <b>plannings ComboHR</b> : heures réellement <b>pointées</b> quand elles existent,
+          sinon heures <b>planifiées</b> (suffixe « ·p »). Un mois sans planning affiche « — » : aucune heure
+          n&apos;est inventée, la fermeture hivernale apparaît donc telle quelle.
         </div>
       </section>
 
@@ -543,6 +543,10 @@ function Detail({ labor, contrats, remPoire, employes, tauxCharges, annee, annee
           </table>
         </div>
         <div className="foot">
+          C&apos;est la <b>décomposition du coût affiché dans l&apos;onglet « Coûts salariaux »</b> : d&apos;où
+          viennent les euros, mois par mois. Source : les <b>heures pointées dans ComboHR</b> valorisées au
+          salaire du contrat (repli sur l&apos;ancien import fichier pour les mois antérieurs à la synchro).
+          <br />
           Brut = salaire de base + majoration des heures supp hors contrat (×1,10 / ×1,20 / ×1,50 au taux horaire
           contractuel) + fériés et 1er mai (+100 %) + 6ème jour (base ÷ 6, « 6 jours payés 7 »), le tout majoré
           de la provision congés payés (+10 %). Pas de majoration de nuit (convention CHR). Coût global = brut ×
