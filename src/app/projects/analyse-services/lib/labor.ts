@@ -154,11 +154,12 @@ export type ComboAgg = {
 }
 
 // Agrège par mois à partir des contrats et des heures synchronisées.
-// `mode` : 'reel' (pointages) ou 'planifie' (planning prévu).
+// `mode` : 'reel' (pointages seuls) · 'planifie' (planning seul) ·
+// 'projete' (pointage si connu, sinon planning → total attendu du mois).
 export function aggregateFromCombo(
   contrats: Contrat[],
   heures: HeuresMois[],
-  mode: 'reel' | 'planifie',
+  mode: 'reel' | 'planifie' | 'projete',
 ): ComboAgg {
   const byContrat = new Map<string, Contrat>()
   for (const c of contrats) byContrat.set(c.id, c)
@@ -171,8 +172,18 @@ export function aggregateFromCombo(
     const c = byContrat.get(h.contrat_id)
     if (!c) continue
     const ym = ymOf(h.mois)
-    const nb = mode === 'reel' ? h.heures_reelles : h.heures_planifiees
-    const supp = mode === 'reel' ? h.supp_equiv_reel : h.supp_equiv_planifie
+    const nb =
+      mode === 'reel'
+        ? h.heures_reelles
+        : mode === 'planifie'
+          ? h.heures_planifiees
+          : (h.heures_projetees ?? h.heures_reelles)
+    const supp =
+      mode === 'reel'
+        ? h.supp_equiv_reel
+        : mode === 'planifie'
+          ? h.supp_equiv_planifie
+          : (h.supp_equiv_projete ?? h.supp_equiv_reel)
     if (!nb && !supp) continue
     months.add(ym)
     brut[ym] = addDetail(brut[ym] || blankDetail(), detailFromHeures(c, ym, supp || 0))

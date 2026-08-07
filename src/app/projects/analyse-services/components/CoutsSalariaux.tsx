@@ -39,7 +39,9 @@ export default function CoutsSalariaux({
   // Source privilégiée : ComboHR (plannings synchronisés). Repli sur l'import
   // fichier (ana_labor) pour les mois non couverts par la synchro.
   const combo = aggregateFromCombo(contrats, heures, 'reel')
-  const comboPrev = aggregateFromCombo(contrats, heures, 'planifie')
+  // Prévisionnel = total attendu : pointages pour les shifts passés, planning
+  // pour ceux à venir (un mois en cours n'est donc pas sous-estimé).
+  const comboPrev = aggregateFromCombo(contrats, heures, 'projete')
   const fileReal = realiseByMonth(labor)
   const fileRealH = heuresRealiseesByMonth(labor)
 
@@ -217,8 +219,9 @@ export default function CoutsSalariaux({
         </div>
         <div className="foot">
           <b>Réalisé</b> : heures réellement pointées dans ComboHR, valorisées au salaire du contrat.{' '}
-          <b>Prévisionnel</b> : planning ComboHR quand il existe, sinon heures hebdo cible saisies dans la zone
-          Détail, au prorata de la période de contrat. Coût global = brut × (1 + {PCT(tauxCharges * 100)} de charges patronales) + complément
+          <b>Prévisionnel</b> : total attendu — heures pointées pour les shifts passés et heures planifiées pour
+          ceux à venir ; à défaut de planning, les heures hebdo cible saisies dans la zone Détail, au prorata de
+          la période de contrat. Coût global = brut × (1 + {PCT(tauxCharges * 100)} de charges patronales) + complément
           « Poire » (cash, <b>non soumis aux charges</b>). Le brut inclut la majoration des heures supp, les
           fériés, le 6ème jour payé et la provision congés payés. Estimation de gestion, pas un calcul de paie.
           {contrats.length === 0 ? (

@@ -142,9 +142,10 @@ export async function syncCombo(
   }
 
   // ─── 4. Heures par contrat × semaine (pour le barème d'heures supp) puis mois
-  type WeekAcc = { reel: number; prev: number }
-  const perWeek = new Map<string, WeekAcc>() // `${lineage}|${weekKey}`
-  const monthHours = new Map<string, { reel: number; prev: number }>() // `${lineage}|${ym}`
+  type Acc = { reel: number; prev: number; proj: number }
+  const blank = (): Acc => ({ reel: 0, prev: 0, proj: 0 })
+  const perWeek = new Map<string, Acc>() // `${lineage}|${weekKey}`
+  const monthHours = new Map<string, Acc>() // `${lineage}|${ym}`
 
   for (const s of shifts) {
     const alias = s.contract_id ?? ''
@@ -154,34 +155,39 @@ export async function syncCombo(
     if (!day.startsWith(annee)) continue
 
     const prev = shiftHours(s, false)
-    const reelRaw = shiftHours(s, true)
-    // Pas de pointage → on ne compte pas d'heures réelles pour ce shift
-    const reel = s.real_starts_at && s.real_ends_at ? reelRaw : 0
+    const pointe = Boolean(s.real_starts_at && s.real_ends_at)
+    const reel = pointe ? shiftHours(s, true) : 0
+    // Projeté : ce qu'on attend au total — pointage si le shift a eu lieu,
+    // sinon planning. C'est la seule mesure juste sur un mois en cours.
+    const proj = pointe ? reel : prev
 
     const wk = `${lineage}|${isoWeekKey(day)}`
-    const w = perWeek.get(wk) ?? { reel: 0, prev: 0 }
+    const w = perWeek.get(wk) ?? blank()
     w.reel += reel
     w.prev += prev
+    w.proj += proj
     perWeek.set(wk, w)
 
     const mk = `${lineage}|${day.slice(0, 7)}`
-    const m = monthHours.get(mk) ?? { reel: 0, prev: 0 }
+    const m = monthHours.get(mk) ?? blank()
     m.reel += reel
     m.prev += prev
+    m.proj += proj
     monthHours.set(mk, m)
   }
 
   // Majoration heures supp, semaine par semaine, rattachée au mois du lundi
-  const monthSupp = new Map<string, { reel: number; prev: number }>()
+  const monthSupp = new Map<string, Acc>()
   for (const [wk, w] of perWeek) {
     const [lineage, weekStart] = wk.split('|')
     const c = byLineage.get(lineage)
     const contratH = c?.contract_time ?? 0
     if (contratH <= 0) continue
     const mk = `${lineage}|${weekStart.slice(0, 7)}`
-    const acc = monthSupp.get(mk) ?? { reel: 0, prev: 0 }
+    const acc = monthSupp.get(mk) ?? blank()
     acc.reel += majoredHours(contratH, w.reel)
     acc.prev += majoredHours(contratH, w.prev)
+    acc.proj += majoredHours(contratH, w.proj)
     monthSupp.set(mk, acc)
   }
 
@@ -189,20 +195,23 @@ export async function syncCombo(
   const heuresRows: Record<string, unknown>[] = []
   let totalReel = 0
   let totalPrev = 0
+  const r2 = (n: number) => Math.round(n * 100) / 100
   for (const [mk, h] of monthHours) {
     const [lineage, ym] = mk.split('|')
     const contratId = idByLineage.get(lineage)
     if (!contratId) continue
-    const supp = monthSupp.get(mk) ?? { reel: 0, prev: 0 }
+    const supp = monthSupp.get(mk) ?? blank()
     totalReel += h.reel
     totalPrev += h.prev
     heuresRows.push({
       contrat_id: contratId,
       mois: `${ym}-01`,
-      heures_reelles: Math.round(h.reel * 100) / 100,
-      heures_planifiees: Math.round(h.prev * 100) / 100,
-      supp_equiv_reel: Math.round(supp.reel * 100) / 100,
-      supp_equiv_planifie: Math.round(supp.prev * 100) / 100,
+      heures_reelles: r2(h.reel),
+      heures_planifiees: r2(h.prev),
+      heures_projetees: r2(h.proj),
+      supp_equiv_reel: r2(supp.reel),
+      supp_equiv_planifie: r2(supp.prev),
+      supp_equiv_projete: r2(supp.proj),
       synced_at: new Date().toISOString(),
     })
   }

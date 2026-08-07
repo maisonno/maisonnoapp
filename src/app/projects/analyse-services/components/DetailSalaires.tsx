@@ -163,13 +163,16 @@ function Detail({ labor, contrats, remPoire, heures, tauxCharges, annee, anneesD
   const poireMap = new Map<string, number>()
   for (const r of remPoire) poireMap.set(`${r.contrat_id}|${ymOf(r.mois)}`, r.montant)
 
-  // Heures issues des plannings Combo (réelles + planifiées), par contrat × mois
+  // Heures issues des plannings Combo, par contrat × mois
   const hReel = new Map<string, number>()
-  const hPrev = new Map<string, number>()
+  const hProj = new Map<string, number>()
   for (const h of heures) {
     const k = `${h.contrat_id}|${ymOf(h.mois)}`
     hReel.set(k, (hReel.get(k) || 0) + (h.heures_reelles || 0))
-    hPrev.set(k, (hPrev.get(k) || 0) + (h.heures_planifiees || 0))
+    hProj.set(
+      k,
+      (hProj.get(k) || 0) + (h.heures_projetees ?? h.heures_reelles ?? 0),
+    )
   }
 
   // Coût réalisé : données Combo en priorité, repli sur l'ancien import fichier
@@ -433,14 +436,22 @@ function Detail({ labor, contrats, remPoire, heures, tauxCharges, annee, anneesD
                     <td>{c.nom_affichage}</td>
                     {months.map((m) => {
                       const r = hReel.get(`${c.id}|${m}`) ?? 0
-                      const p = hPrev.get(`${c.id}|${m}`) ?? 0
-                      const v = r || p
+                      const v = hProj.get(`${c.id}|${m}`) ?? 0
                       tot += v
                       if (!v) return <td key={m}>—</td>
+                      const aVenir = Math.round((v - r) * 10) / 10
                       return (
                         <td key={m} style={{ color: r ? undefined : 'var(--ink-soft)' }}>
                           {N1(v)}
-                          {r ? null : <span title="planifié, non encore pointé"> ·p</span>}
+                          {aVenir > 0 ? (
+                            <span
+                              title={`${N1(r)} h pointées + ${N1(aVenir)} h planifiées à venir`}
+                              style={{ color: 'var(--ink-soft)' }}
+                            >
+                              {' '}
+                              ·p
+                            </span>
+                          ) : null}
                         </td>
                       )
                     })}
@@ -454,9 +465,11 @@ function Detail({ labor, contrats, remPoire, heures, tauxCharges, annee, anneesD
           </table>
         </div>
         <div className="foot">
-          Heures issues des <b>plannings ComboHR</b> : heures réellement <b>pointées</b> quand elles existent,
-          sinon heures <b>planifiées</b> (suffixe « ·p »). Un mois sans planning affiche « — » : aucune heure
-          n&apos;est inventée, la fermeture hivernale apparaît donc telle quelle.
+          Heures issues des <b>plannings ComboHR</b>, combinées <b>shift par shift</b> : un shift déjà effectué
+          compte ses heures <b>pointées</b>, un shift à venir ses heures <b>planifiées</b>. Le total d&apos;un
+          mois en cours inclut donc le reste du planning — le suffixe « ·p » signale les mois qui contiennent des
+          heures encore à venir (survole pour voir la répartition pointé / à venir). Un mois sans planning
+          affiche « — » : aucune heure n&apos;est inventée, la fermeture hivernale apparaît telle quelle.
         </div>
       </section>
 
