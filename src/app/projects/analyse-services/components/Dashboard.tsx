@@ -24,17 +24,20 @@ import {
   type WeekdayPivot,
 } from '../lib/analytics'
 import { EUR, EUR2, INT, N1, PCT, frDMY, frDate, frMD } from '../lib/format'
+import { meteoIcon, meteoTooltip } from '../lib/meteo'
+import type { MeteoJourRow } from '../lib/queries'
 
 type Props = {
   tickets: TicketMetric[]
   poire: PoireDay[]
   labor: LaborRow[]
   pinsaByMonth: Record<string, number>
+  meteo: Record<string, MeteoJourRow>
 }
 
 const CUTOFFS = [17, 16, 18, 19, 12]
 
-export default function Dashboard({ tickets, poire, labor, pinsaByMonth }: Props) {
+export default function Dashboard({ tickets, poire, labor, pinsaByMonth, meteo }: Props) {
   const poireMap = useMemo(() => buildPoireMap(poire), [poire])
   const hasP = hasPoire(poireMap)
 
@@ -258,7 +261,15 @@ export default function Dashboard({ tickets, poire, labor, pinsaByMonth }: Props
       {/* Jour par jour */}
       <section>
         <div className="h2">Jour par jour</div>
-        <Daily C={C} poireMap={poireMap} ctrl={ctrl} hasP={hasP} laborPerDay={L.perDay} hasLab={hasLab} />
+        <Daily
+          C={C}
+          poireMap={poireMap}
+          ctrl={ctrl}
+          hasP={hasP}
+          laborPerDay={L.perDay}
+          hasLab={hasLab}
+          meteo={meteo}
+        />
       </section>
 
       <Foot cutoff={cutoff} baseUp={baseUp} hasP={hasP} />
@@ -1228,6 +1239,7 @@ function Daily({
   hasP,
   laborPerDay,
   hasLab,
+  meteo,
 }: {
   C: ReturnType<typeof compute>
   poireMap: Record<string, number>
@@ -1235,8 +1247,11 @@ function Daily({
   hasP: boolean
   laborPerDay: Record<string, number>
   hasLab: boolean
+  meteo: Record<string, MeteoJourRow>
 }) {
   const ds = Object.keys(C.days).sort()
+  // Colonne météo affichée seulement si la synchro Open-Meteo couvre la période
+  const hasMeteo = ds.some((d) => meteo[d])
   const tt = { resto: 0, dessert: 0, bar: 0, couverts: 0, poire: 0, total: 0, labor: 0 }
   // Poire = cash non soumis à la TVA → même montant en TTC et HT.
   const poireVal = (montant: number) => (ctrl.incPoire && hasP ? montant : 0)
@@ -1253,9 +1268,15 @@ function Daily({
     tt.poire += pV
     tt.total += lineTot
     tt.labor += lab
+    const m = meteo[d]
     return (
       <tr key={d}>
         <td>{frDate(d)}</td>
+        {hasMeteo ? (
+          <td className="meteo" title={m ? meteoTooltip(m) : 'Météo non synchronisée'}>
+            {m ? meteoIcon(m.weather_code) : '—'}
+          </td>
+        ) : null}
         <td>{EUR(x.resto)}</td>
         <td>{EUR(x.dessert)}</td>
         <td>{EUR(x.bar)}</td>
@@ -1275,6 +1296,7 @@ function Daily({
         <thead>
           <tr>
             <th>Jour</th>
+            {hasMeteo ? <th>Météo</th> : null}
             <th>Restaurant</th>
             <th>Desserts</th>
             <th>Bar</th>
@@ -1288,6 +1310,7 @@ function Daily({
           {rows}
           <tr className="tot">
             <td>Total</td>
+            {hasMeteo ? <td /> : null}
             <td>{EUR(tt.resto)}</td>
             <td>{EUR(tt.dessert)}</td>
             <td>{EUR(tt.bar)}</td>
@@ -1317,7 +1340,13 @@ function Foot({ cutoff, baseUp, hasP }: { cutoff: number; baseUp: string; hasP: 
       {hasP
         ? 'La Poire (cash comptoir hors caisse) est ajoutée au bar et au total ; non ventilée midi/soir car saisie au jour. Non soumise à la TVA, elle affiche le même montant en TTC et en HT.'
         : 'Importe ta caisse Scoubidoo (.csv) ou ton fichier Poire (.xlsx avec colonnes Date + Poire) pour intégrer le cash comptoir.'}{' '}
-      Le panier moyen et les taux se basent sur les couverts saisis dans L&apos;Addition.
+      Le panier moyen et les taux se basent sur les couverts saisis dans L&apos;Addition. La colonne{' '}
+      <b>Météo</b> résume la journée à l&apos;Île du Levant (43,017 N / 6,467 E) — survole le pictogramme pour
+      le détail (températures, pluie, vent). Données{' '}
+      <a href="https://open-meteo.com" target="_blank" rel="noreferrer noopener">
+        Open-Meteo
+      </a>{' '}
+      (CC BY 4.0), réanalyse ERA5 pour l&apos;historique et prévisions pour les jours récents.
     </div>
   )
 }

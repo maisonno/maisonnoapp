@@ -4,6 +4,7 @@ import { getImportLog } from '../lib/queries'
 import ImportClient from '../components/ImportClient'
 import ImportPoireScoubidoo from '../components/ImportPoireScoubidoo'
 import ComboSync from '../components/ComboSync'
+import SyncMeteo from '../components/SyncMeteo'
 import PageHeader from '../components/PageHeader'
 
 export const metadata = { title: 'Import — Analyse des services' }
@@ -35,6 +36,8 @@ export default async function ImportPage() {
       <ImportPoireScoubidoo />
 
       <ComboSync />
+
+      <SyncMeteo />
 
       <section>
         <div className="h2">Journal des imports</div>

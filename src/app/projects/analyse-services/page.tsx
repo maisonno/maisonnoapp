@@ -7,6 +7,7 @@ import {
   getAllTicketMetrics,
   getContrats,
   getHeuresMois,
+  getMeteo,
   getParam,
   getPinsaMonthly,
   getPrimes,
@@ -117,11 +118,12 @@ export default async function AnalyseServicesPage({
   }
 
   // ─── Onglet Revenus caisse (par défaut) ───
-  const [tickets, poire, labor, pinsaByMonth] = await Promise.all([
+  const [tickets, poire, labor, pinsaByMonth, meteo] = await Promise.all([
     getAllTicketMetrics(),
     getAllPoire(),
     getAllLabor(),
     getPinsaMonthly(),
+    getMeteo(),
   ])
 
   if (tickets.length === 0) {
@@ -143,7 +145,13 @@ export default async function AnalyseServicesPage({
   return (
     <div className="wrap">
       <PageHeader sub={SUB_REVENUS} />
-      <Dashboard tickets={tickets} poire={poire} labor={labor} pinsaByMonth={pinsaByMonth} />
+      <Dashboard
+        tickets={tickets}
+        poire={poire}
+        labor={labor}
+        pinsaByMonth={pinsaByMonth}
+        meteo={meteo}
+      />
     </div>
   )
 }

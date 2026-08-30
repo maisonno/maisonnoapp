@@ -180,6 +180,38 @@ export async function getLaborEmployes(): Promise<LaborEmploye[]> {
   return [...seen.values()]
 }
 
+// Météo quotidienne (Île du Levant), indexée par jour
+export type MeteoJourRow = {
+  jour: string
+  weather_code: number | null
+  t_max: number | null
+  t_min: number | null
+  precipitation: number | null
+  vent_max: number | null
+}
+
+export async function getMeteo(): Promise<Record<string, MeteoJourRow>> {
+  const supabase = await createClient()
+  const all: MeteoJourRow[] = []
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await supabase
+      .from('ana_meteo_daily')
+      .select('jour,weather_code,t_max,t_min,precipitation,vent_max')
+      .order('jour', { ascending: true })
+      .range(from, from + PAGE - 1)
+    if (error) {
+      console.error('[ana] getMeteo error:', error.code, error.message)
+      break
+    }
+    if (!data || data.length === 0) break
+    all.push(...(data as unknown as MeteoJourRow[]))
+    if (data.length < PAGE) break
+  }
+  const m: Record<string, MeteoJourRow> = {}
+  for (const r of all) m[r.jour.slice(0, 10)] = r
+  return m
+}
+
 export async function getPinsaMonthly(): Promise<Record<string, number>> {
   const supabase = await createClient()
   const { data, error } = await supabase.from('ana_v_pinsa_monthly').select('ym,n_pinsa')

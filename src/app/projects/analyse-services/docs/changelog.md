@@ -1,5 +1,23 @@
 # Changelog
 
+## 2026-08-30 — Colonne Météo (jour par jour)
+- **Source retenue : Open-Meteo** (`open-meteo.com`) — sans clé API, licence
+  CC BY 4.0 (usage commercial autorisé avec attribution). Deux endpoints :
+  `archive-api/v1/archive` (réanalyse ERA5, fiable mais ~5 jours de latence)
+  pour l'historique, et `api/v1/forecast?past_days=…` pour la fenêtre récente
+  et les 7 jours à venir. Point d'observation : **Île du Levant, 43,017 N /
+  6,467 E**, fuseau `Europe/Paris`.
+- Migration `0022_meteo.sql` : table `ana_meteo_daily` (`jour` PK, `weather_code`
+  WMO, `t_max`, `t_min`, `precipitation`, `vent_max`, `source`).
+- `lib/meteo.ts` : table de correspondance **code WMO → pictogramme** (28 codes)
+  et infobulle « Couvert · 24 / 18 °C · 3 mm · vent 35 km/h ».
+- Action `syncMeteo()` + bouton **« Synchroniser la météo »** sur la page
+  Importation : couvre du premier jour de ventes jusqu'aux prévisions, upsert
+  idempotent sur `jour`.
+- Onglet **Revenus caisse** : nouvelle colonne **Météo** dans le tableau jour
+  par jour (pictogramme + détail au survol). La colonne n'apparaît que si la
+  synchro couvre la période affichée.
+
 ## 2026-08-02 — Connecteur ComboHR Partner API (remplace l'import fichier)
 - **Synchronisation** depuis `https://partner.combohr.com/api/v1` (auth Bearer) :
   `/locations`, `/contracts` (+ `/past_contracts`), `/plannings`.

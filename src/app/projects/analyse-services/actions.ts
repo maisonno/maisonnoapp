@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { comboConfigured, diagnoseAuth, getLocations, type ComboAuthDiag } from './lib/combo'
 import { syncCombo, type SyncReport } from './lib/combo-sync'
+import { fetchArchive, fetchRecent, type MeteoJour } from './lib/meteo'
 
 const PATHS = [
   '/projects/analyse-services',
@@ -240,6 +241,70 @@ export async function syncComboAction(
     const report = await syncCombo(supabase, locationId, locationName, annee)
     revalidate()
     return { report }
+  } catch (e) {
+    return { error: (e as Error).message }
+  }
+}
+
+// ─── Météo (Open-Meteo, Île du Levant) ───
+
+export type MeteoSyncState = {
+  error?: string
+  success?: string
+  jours?: number
+  periode?: string
+}
+
+export async function syncMeteo(): Promise<MeteoSyncState> {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) return { error: 'Non authentifié.' }
+
+  // Période à couvrir : celle des ventes, jusqu'à aujourd'hui
+  const { data: bornes, error: eB } = await supabase
+    .from('ana_tickets')
+    .select('jour')
+    .order('jour', { ascending: true })
+    .limit(1)
+  if (eB) return { error: `Lecture des ventes : ${eB.message}` }
+  const premierJour = (bornes as { jour: string }[])?.[0]?.jour
+  if (!premierJour) return { error: 'Aucune vente en base : rien à couvrir.' }
+
+  const jourIso = (d: Date) => d.toISOString().slice(0, 10)
+  const today = new Date()
+  // L'archive ERA5 accuse ~5 jours de retard ; on prend une marge de 6.
+  const finArchive = new Date(today.getTime() - 6 * 86400000)
+
+  try {
+    const rows: MeteoJour[] = []
+
+    if (premierJour <= jourIso(finArchive)) {
+      rows.push(...(await fetchArchive(premierJour, jourIso(finArchive))))
+    }
+    // Jours récents et prévisions : complètent la fin, sans écraser l'archive
+    const recents = await fetchRecent(12, 7)
+    const dejaVus = new Set(rows.map((r) => r.jour))
+    rows.push(...recents.filter((r) => !dejaVus.has(r.jour)))
+
+    const valides = rows.filter((r) => r.jour && r.weather_code != null)
+    if (valides.length === 0) return { error: 'Open-Meteo n’a renvoyé aucune journée exploitable.' }
+
+    for (let i = 0; i < valides.length; i += 500) {
+      const { error } = await supabase
+        .from('ana_meteo_daily')
+        .upsert(valides.slice(i, i + 500), { onConflict: 'jour' })
+      if (error) return { error: `Écriture : ${error.message}` }
+    }
+
+    revalidate()
+    const tri = valides.map((r) => r.jour).sort()
+    return {
+      success: `Météo synchronisée : ${valides.length} jours.`,
+      jours: valides.length,
+      periode: `${tri[0]} → ${tri[tri.length - 1]}`,
+    }
   } catch (e) {
     return { error: (e as Error).message }
   }

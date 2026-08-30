@@ -680,6 +680,12 @@
   color: var(--dessert);
   font-weight: 600;
 }
+.ana-scope table.day td.meteo {
+  text-align: center;
+  font-size: 16px;
+  line-height: 1;
+  cursor: help;
+}
 
 /* Footer + erreurs */
 .ana-scope .foot {
