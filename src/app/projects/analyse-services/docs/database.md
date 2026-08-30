@@ -66,6 +66,18 @@ Migration `0013_labor.sql`. 1 ligne = 1 salarié × 1 mois de paie.
 PK `(periode, employe_hash)` → ré-importer un mois ne crée pas de doublon. Le
 calcul du brut/chargé est fait en TypeScript (`analytics.ts`), pas en base.
 
+### `ana_meteo_daily` — météo quotidienne à l'Île du Levant (migration `0022`)
+`jour` (date, **PK**), `weather_code` (smallint, codification **WMO** : 0 = ciel
+dégagé, 3 = couvert, 61 = pluie, 95 = orage…), `t_max` / `t_min` (°C),
+`precipitation` (mm cumulés), `vent_max` (km/h), `source` (`'archive'` pour la
+réanalyse ERA5, `'forecast'` pour la fenêtre récente et les prévisions),
+`synced_at`.
+
+Alimentée par l'action `syncMeteo()` depuis **Open-Meteo** (sans clé, CC BY 4.0)
+pour le point 43,017 N / 6,467 E. Upsert sur `jour` → la synchro est
+ré-exécutable à volonté ; les jours issus de la prévision sont écrasés par
+l'archive ERA5 dès qu'elle les couvre (~5 jours de latence).
+
 ### `ana_import_log` — journal des imports
 `id`, `kind` ('ventes'|'poire'|'combo'), `file_name`, `rows_in`, `tickets_upserted`,
 `lines_upserted`, `poire_upserted`, `labor_upserted`, `created_at`.
