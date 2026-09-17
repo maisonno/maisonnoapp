@@ -26,6 +26,7 @@ export type SyncReport = {
   moisAvecHeures: number
   semainesPlanifiees: number
   shiftsJour: number
+  shiftsIgnores: number
   heuresReelles: number
   heuresPlanifiees: number
 }
@@ -38,6 +39,13 @@ const monthsOf = (year: string) =>
 const lastDay = (ym: string) => {
   const [y, m] = ym.split('-').map(Number)
   return `${ym}-${String(new Date(Date.UTC(y, m, 0)).getUTCDate()).padStart(2, '0')}`
+}
+
+// Lendemain d'une date 'YYYY-MM-DD'
+const dayAfter = (iso: string) => {
+  const d = new Date(`${iso}T00:00:00Z`)
+  d.setUTCDate(d.getUTCDate() + 1)
+  return d.toISOString().slice(0, 10)
 }
 
 const fullName = (c: ComboContract) =>
@@ -140,11 +148,21 @@ export async function syncCombo(
   }
 
   // ─── 3. Plannings mois par mois
-  const shifts: ComboPlanning[] = []
+  //
+  // La borne `end_date` de /plannings est EXCLUSIVE : demander le 30/06 ne rend
+  // les shifts que jusqu'au 29/06. On demande donc le LENDEMAIN du dernier jour.
+  // Les fenêtres se recouvrent alors d'une journée ; la déduplication par id
+  // ci-dessous l'absorbe — et couvrirait aussi le cas où Combo rendrait un jour
+  // cette borne inclusive. Sans elle, le jour de recouvrement serait compté
+  // DEUX FOIS dans les heures mensuelles et hebdomadaires.
+  const shiftsById = new Map<string, ComboPlanning>()
   for (const ym of months) {
-    const batch = await getPlannings(`${ym}-01`, lastDay(ym), locationId)
-    shifts.push(...batch)
+    const batch = await getPlannings(`${ym}-01`, dayAfter(lastDay(ym)), locationId)
+    for (const s of batch) {
+      shiftsById.set(String(s.id ?? `${s.contract_id}|${s.date}|${s.starts_at}`), s)
+    }
   }
+  const shifts = [...shiftsById.values()]
 
   // ─── 4. Heures par contrat × semaine (pour le barème d'heures supp) puis mois
   type Acc = { reel: number; prev: number; proj: number }
@@ -154,6 +172,9 @@ export async function syncCombo(
   // Détail jour par jour, dédoublonné sur l'id Combo du shift
   const shiftRows = new Map<string, Record<string, unknown>>()
   const syncedAt = new Date().toISOString()
+  // Shifts rendus par Combo mais rattachés à un contrat qu'on n'a pas résolu :
+  // ils seraient perdus en silence, on les compte pour pouvoir le constater.
+  let shiftsIgnores = 0
 
   for (const s of shifts) {
     const alias = s.contract_id ?? ''
@@ -169,15 +190,23 @@ export async function syncCombo(
     // sinon planning. C'est la seule mesure juste sur un mois en cours.
     const proj = pointe ? reel : prev
 
-    // Détail du shift : on retient le pointage s'il existe, sinon le planning.
+    // Détail du shift. On conserve les DEUX mesures — planning et pointage —
+    // et `duree_heures` reprend celle qui fait foi (le pointage s'il existe).
+    // `type` dit laquelle des deux a été retenue.
     const contratId = idByLineage.get(lineage)
-    if (contratId && s.id) {
+    if (!contratId) {
+      shiftsIgnores++
+      continue
+    }
+    if (s.id) {
       shiftRows.set(String(s.id), {
         combo_shift_id: String(s.id),
         contrat_id: contratId,
         jour: day,
         debut: (pointe ? s.real_starts_at : s.starts_at) ?? null,
         fin: (pointe ? s.real_ends_at : s.ends_at) ?? null,
+        heures_planifiees: r2(prev),
+        heures_pointees: pointe ? r2(reel) : null,
         duree_heures: r2(proj),
         type: proj > 0 ? (pointe ? 'pointe' : 'planifie') : 'sans_duree',
         synced_at: syncedAt,
@@ -308,6 +337,7 @@ export async function syncCombo(
     moisAvecHeures: heuresRows.length,
     semainesPlanifiees: semaineRows.length,
     shiftsJour: shiftList.length,
+    shiftsIgnores,
     heuresReelles: Math.round(totalReel),
     heuresPlanifiees: Math.round(totalPrev),
   }
