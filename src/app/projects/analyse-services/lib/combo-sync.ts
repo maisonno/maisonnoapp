@@ -9,6 +9,7 @@ import {
   getPastContracts,
   getPlannings,
   isoWeekKey,
+  shiftDay,
   shiftHours,
   type ComboContract,
   type ComboPlanning,
@@ -24,9 +25,12 @@ export type SyncReport = {
   shifts: number
   moisAvecHeures: number
   semainesPlanifiees: number
+  shiftsJour: number
   heuresReelles: number
   heuresPlanifiees: number
 }
+
+const r2 = (n: number) => Math.round(n * 100) / 100
 
 const monthsOf = (year: string) =>
   Array.from({ length: 12 }, (_, i) => `${year}-${String(i + 1).padStart(2, '0')}`)
@@ -147,12 +151,15 @@ export async function syncCombo(
   const blank = (): Acc => ({ reel: 0, prev: 0, proj: 0 })
   const perWeek = new Map<string, Acc>() // `${lineage}|${weekKey}`
   const monthHours = new Map<string, Acc>() // `${lineage}|${ym}`
+  // Détail jour par jour, dédoublonné sur l'id Combo du shift
+  const shiftRows = new Map<string, Record<string, unknown>>()
+  const syncedAt = new Date().toISOString()
 
   for (const s of shifts) {
     const alias = s.contract_id ?? ''
     const lineage = aliasToLineage.get(alias) ?? alias
     if (!lineage) continue
-    const day = (s.date ?? s.starts_at ?? '').slice(0, 10)
+    const day = shiftDay(s)
     if (!day.startsWith(annee)) continue
 
     const prev = shiftHours(s, false)
@@ -161,6 +168,21 @@ export async function syncCombo(
     // Projeté : ce qu'on attend au total — pointage si le shift a eu lieu,
     // sinon planning. C'est la seule mesure juste sur un mois en cours.
     const proj = pointe ? reel : prev
+
+    // Détail du shift : on retient le pointage s'il existe, sinon le planning.
+    const contratId = idByLineage.get(lineage)
+    if (contratId && s.id) {
+      shiftRows.set(String(s.id), {
+        combo_shift_id: String(s.id),
+        contrat_id: contratId,
+        jour: day,
+        debut: (pointe ? s.real_starts_at : s.starts_at) ?? null,
+        fin: (pointe ? s.real_ends_at : s.ends_at) ?? null,
+        duree_heures: r2(proj),
+        type: proj > 0 ? (pointe ? 'pointe' : 'planifie') : 'sans_duree',
+        synced_at: syncedAt,
+      })
+    }
 
     const wk = `${lineage}|${isoWeekKey(day)}`
     const w = perWeek.get(wk) ?? blank()
@@ -196,7 +218,6 @@ export async function syncCombo(
   const heuresRows: Record<string, unknown>[] = []
   let totalReel = 0
   let totalPrev = 0
-  const r2 = (n: number) => Math.round(n * 100) / 100
   for (const [mk, h] of monthHours) {
     const [lineage, ym] = mk.split('|')
     const contratId = idByLineage.get(lineage)
@@ -256,6 +277,27 @@ export async function syncCombo(
     if (error) throw new Error(`Écriture des semaines : ${error.message}`)
   }
 
+  // ─── 7. Shifts jour par jour (comptage des semaines à 6 jours et plus)
+  // Même logique que les semaines : on vide l'année pour les contrats liés à
+  // Combo avant de réécrire, sinon un shift supprimé dans Combo survivrait ici
+  // et gonflerait le nombre de jours travaillés.
+  if (contratIds.length > 0) {
+    const { error } = await supabase
+      .from('ana_shifts_jour')
+      .delete()
+      .in('contrat_id', contratIds)
+      .gte('jour', `${annee}-01-01`)
+      .lte('jour', `${annee}-12-31`)
+    if (error) throw new Error(`Nettoyage des shifts : ${error.message}`)
+  }
+  const shiftList = [...shiftRows.values()]
+  for (let i = 0; i < shiftList.length; i += 500) {
+    const { error } = await supabase
+      .from('ana_shifts_jour')
+      .upsert(shiftList.slice(i, i + 500), { onConflict: 'combo_shift_id' })
+    if (error) throw new Error(`Écriture des shifts : ${error.message}`)
+  }
+
   return {
     locationName,
     annee,
@@ -265,6 +307,7 @@ export async function syncCombo(
     shifts: shifts.length,
     moisAvecHeures: heuresRows.length,
     semainesPlanifiees: semaineRows.length,
+    shiftsJour: shiftList.length,
     heuresReelles: Math.round(totalReel),
     heuresPlanifiees: Math.round(totalPrev),
   }

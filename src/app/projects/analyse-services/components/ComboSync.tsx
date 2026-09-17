@@ -168,7 +168,8 @@ export default function ComboSync() {
         <>
           <div className="msg-ok">
             ✅ {r.locationName} · {r.annee} — {r.contrats} contrat(s), {r.shifts.toLocaleString('fr-FR')} shift(s)
-            sur {r.moisAvecHeures} mois.
+            sur {r.moisAvecHeures} mois, dont {r.shiftsJour.toLocaleString('fr-FR')} détaillé(s) jour par
+            jour.
           </div>
           <div className="kpis">
             <div className="kpi">

@@ -66,6 +66,40 @@ Migration `0013_labor.sql`. 1 ligne = 1 salarié × 1 mois de paie.
 PK `(periode, employe_hash)` → ré-importer un mois ne crée pas de doublon. Le
 calcul du brut/chargé est fait en TypeScript (`analytics.ts`), pas en base.
 
+### `ana_shifts_jour` — shifts jour par jour (migration `0023`)
+`combo_shift_id` (text, **PK** — id Combo du shift, porte l'idempotence),
+`contrat_id` (→ `ana_contrats(id)`, `on delete cascade`), `jour` (date **locale
+Europe/Paris** ; un service qui finit après minuit reste rattaché à son jour de
+début), `debut` / `fin` (timestamptz), `duree_heures` (pauses déduites),
+`type`, `synced_at`. Index sur `(contrat_id, jour)` et sur `(jour)`.
+
+`type` ne retient que ce que Combo permet d'affirmer :
+`'pointe'` (début **et** fin réels pointés → journée travaillée avérée),
+`'planifie'` (planning sans pointage : shift à venir ou pointage non saisi),
+`'sans_duree'` (durée nulle → ni comptée, ni « travaillée »).
+`/plannings` ne renvoie que des shifts de travail ; **absences et repos relèvent
+d'une autre ressource de l'API et ne sont pas chargés ici**.
+
+Alimentée par la même synchro que `ana_heures_mois` — aucun appel Combo
+supplémentaire, `/plannings` renvoyait déjà le détail par shift. La synchro
+**vide l'année** pour les contrats liés à Combo avant de réécrire : un shift
+supprimé dans Combo disparaît donc aussi d'ici.
+
+### Vue `v_repos_hebdo` — repos hebdomadaires non pris (migration `0023`)
+Une ligne par **contrat × semaine civile** (lundi → dimanche) :
+- `semaine` — le lundi (`date_trunc('week', …)`, qui cale sur le lundi) ;
+- `mois_rattachement` — mois du **dimanche** (lundi + 6), donc une semaine à
+  cheval sur deux mois compte pour celui où elle se termine ;
+- `jours_travailles` — nombre de **jours distincts** avec au moins un shift
+  travaillé (`type in ('pointe','planifie')` et `duree_heures > 0`) ;
+- `repos_non_pris` = `greatest(0, jours_travailles - 5)`.
+
+La convention **HCR** prévoit 2 jours de repos par semaine pour les saisonniers ;
+les repos non pris doivent être récupérés ou payés en fin de saison.
+
+Déclarée `security_invoker = true` : la vue s'exécute avec les droits de
+l'appelant, donc la RLS de `ana_shifts_jour` s'applique réellement.
+
 ### `ana_meteo_daily` — météo quotidienne à l'Île du Levant (migration `0022`)
 `jour` (date, **PK**), `weather_code` (smallint, codification **WMO** : 0 = ciel
 dégagé, 3 = couvert, 61 = pluie, 95 = orage…), `t_max` / `t_min` (°C),
