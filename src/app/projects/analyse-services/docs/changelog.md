@@ -1,5 +1,21 @@
 # Changelog
 
+## 2026-09-17 — Shifts jour par jour et repos hebdomadaires non pris
+- Migration `0023` : table `ana_shifts_jour` (un enregistrement par shift Combo,
+  jour local Europe/Paris, durée pauses déduites, type) et vue `v_repos_hebdo`
+  (jours travaillés et `repos_non_pris = greatest(0, jours − 5)` par contrat et
+  par semaine civile) — base du suivi des **2 jours de repos hebdomadaires**
+  prévus par la convention **HCR** pour les saisonniers.
+- **Aucun appel ComboHR supplémentaire** : `/plannings` renvoyait déjà le détail
+  par shift, la synchro se contentait de l'agréger au mois et à la semaine puis
+  de le jeter. On le conserve désormais.
+- Rattachement au jour corrigé : `shiftDay()` utilise le champ `date` de Combo
+  (jour de début du service, donc un shift finissant après minuit y reste
+  rattaché) et, à défaut, convertit `starts_at` en **heure de Paris** — un
+  `slice(0,10)` sur l'ISO UTC datait de la veille un service ouvrant à 00h30.
+- Les shifts supprimés dans Combo disparaissent de la table : l'année est vidée
+  pour les contrats liés avant réécriture, comme pour `ana_semaines_planifiees`.
+
 ## 2026-08-30 — Colonne Météo (jour par jour)
 - **Source retenue : Open-Meteo** (`open-meteo.com`) — sans clé API, licence
   CC BY 4.0 (usage commercial autorisé avec attribution). Deux endpoints :

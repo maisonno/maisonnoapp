@@ -412,6 +412,28 @@ export function shiftHours(p: ComboPlanning, real: boolean): number {
   return Math.max(0, ms / 3600000 - brk / 60)
 }
 
+// Date locale Europe/Paris d'un instant ISO. `en-CA` formate en YYYY-MM-DD.
+const PARIS_DAY = new Intl.DateTimeFormat('en-CA', {
+  timeZone: 'Europe/Paris',
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+})
+export function parisDay(iso: string): string {
+  const d = new Date(iso)
+  return isFinite(d.getTime()) ? PARIS_DAY.format(d) : ''
+}
+
+// Jour de rattachement d'un shift. Combo fournit `date` : c'est le jour de
+// DÉBUT du service, donc un shift qui finit après minuit y reste rattaché. En
+// son absence on repasse par le début réel, converti en heure de Paris — un
+// `slice(0,10)` sur l'ISO UTC daterait de la veille un service ouvrant à 00h30.
+export function shiftDay(p: ComboPlanning): string {
+  if (p.date) return p.date.slice(0, 10)
+  const s = p.starts_at || p.real_starts_at
+  return s ? parisDay(s) : ''
+}
+
 // Clé de semaine ISO (lundi) d'une date 'YYYY-MM-DD'
 export function isoWeekKey(day: string): string {
   const d = new Date(`${day}T00:00:00Z`)
