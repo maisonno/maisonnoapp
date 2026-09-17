@@ -1250,8 +1250,11 @@ function Daily({
   meteo: Record<string, MeteoJourRow>
 }) {
   const ds = Object.keys(C.days).sort()
-  // Colonne météo affichée seulement si la synchro Open-Meteo couvre la période
-  const hasMeteo = ds.some((d) => meteo[d])
+  // Colonne météo affichée seulement si la synchro Open-Meteo couvre la période.
+  // `meteo` peut manquer le temps d'un déploiement (page servie par l'ancienne
+  // version, script par la nouvelle) : on dégrade au lieu de planter la page.
+  const meteoMap = meteo ?? {}
+  const hasMeteo = ds.some((d) => meteoMap[d])
   const tt = { resto: 0, dessert: 0, bar: 0, couverts: 0, poire: 0, total: 0, labor: 0 }
   // Poire = cash non soumis à la TVA → même montant en TTC et HT.
   const poireVal = (montant: number) => (ctrl.incPoire && hasP ? montant : 0)
@@ -1268,7 +1271,7 @@ function Daily({
     tt.poire += pV
     tt.total += lineTot
     tt.labor += lab
-    const m = meteo[d]
+    const m = meteoMap[d]
     return (
       <tr key={d}>
         <td>{frDate(d)}</td>
