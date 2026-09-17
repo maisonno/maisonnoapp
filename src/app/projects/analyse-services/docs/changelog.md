@@ -1,5 +1,19 @@
 # Changelog
 
+## 2026-09-17 — Correction : le dernier jour de chaque mois était perdu
+- **`end_date` de `/plannings` est EXCLUSIVE.** La synchro demandait
+  `start_date=2026-06-01&end_date=2026-06-30` et ne recevait les shifts que
+  jusqu'au **29** juin. Chaque fenêtre mensuelle perdait ainsi son dernier jour,
+  pour tous les salariés — d'où des semaines sous-comptées et des repos non pris
+  invisibles. La fenêtre s'arrête désormais au **lendemain** du dernier jour.
+- Les fenêtres se recouvrant d'une journée, les shifts sont **dédoublonnés par
+  id** avant tout calcul : sans cela le jour de recouvrement serait compté deux
+  fois dans `ana_heures_mois` et dans les semaines.
+- Migration `0024` : `heures_planifiees` et `heures_pointees` s'ajoutent à
+  `duree_heures`, qui reste la mesure faisant foi (pointage sinon planning).
+- La synchro compte et signale les **shifts sans contrat rattaché**, jusqu'ici
+  écartés en silence.
+
 ## 2026-09-17 — Shifts jour par jour et repos hebdomadaires non pris
 - Migration `0023` : table `ana_shifts_jour` (un enregistrement par shift Combo,
   jour local Europe/Paris, durée pauses déduites, type) et vue `v_repos_hebdo`

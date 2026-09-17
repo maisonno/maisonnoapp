@@ -70,8 +70,14 @@ calcul du brut/chargé est fait en TypeScript (`analytics.ts`), pas en base.
 `combo_shift_id` (text, **PK** — id Combo du shift, porte l'idempotence),
 `contrat_id` (→ `ana_contrats(id)`, `on delete cascade`), `jour` (date **locale
 Europe/Paris** ; un service qui finit après minuit reste rattaché à son jour de
-début), `debut` / `fin` (timestamptz), `duree_heures` (pauses déduites),
-`type`, `synced_at`. Index sur `(contrat_id, jour)` et sur `(jour)`.
+début), `debut` / `fin` (timestamptz), `heures_planifiees`, `heures_pointees`,
+`duree_heures` (pauses déduites), `type`, `synced_at`.
+Index sur `(contrat_id, jour)` et sur `(jour)`.
+
+Trois mesures de durée (migration `0024`) : `heures_planifiees` (du planning),
+`heures_pointees` (du pointage, `NULL` s'il n'y en a pas) et `duree_heures`, la
+mesure **qui fait foi** — le pointage quand il existe, sinon le planning. C'est
+`duree_heures` qu'utilisent `v_repos_hebdo` et les calculs de coût.
 
 `type` ne retient que ce que Combo permet d'affirmer :
 `'pointe'` (début **et** fin réels pointés → journée travaillée avérée),
